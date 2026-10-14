@@ -110,7 +110,14 @@ To refit: `node props.js tune` writes `props_params.json`. Then re-export to `pr
 
 ## Navigation and phone app (latest)
 
-- Header has two swipeable rows. **Week tabs** (Wk 2-18; the upcoming week is selected) set `curWeek` via `setWeek()`. **Section tabs**: Games | QB | RB | WR/TE | Props | Tracker | Model | Teams. The last-used tab is remembered.
+- Header rows (rebuilt on the work PC 2026-10-14 from the Mac session's description):
+  1. Title "Sports Predictor" + **week dropdown** (`#weekSel` → `setWeek()`).
+  2. **Sport tabs**: NFL | NBA | MLB | NHL (`setSport`). Only NFL is built; the others show `#tab-soon`.
+  3. **Sections**: Games | Players | Props | Teams.
+  4. **Sub-tabs** (`SECTIONS`): Games → Picks (`week`), Model (`picks`); Players → QB, RB, WR/TE (`pos-*`); Props → Props, Tracker; Teams (no sub-tabs).
+  - `curTab` stores the innermost id, so screen render code is unchanged. The last-used sub-tab per section is remembered.
+- **Teams tab**: Scores = avg(team Off PPP, league PPP) × team plays/g; Allows = avg(league PPP, team Def PPP) × league plays/g; Margin = Scores − Allows (the default sort). Season totals sit behind a toggle.
+- The Mac's own version of this redesign (last night) was never pushed. Tonight, decide whether to keep GitHub's rebuild (`git fetch && git reset --hard origin/main` on the Mac) or merge the Mac's.
 - **QB / RB / WR/TE** tabs (`renderPosition`) show that position's system (`systemCardsHtml(week, [sys])`) and DraftKings props rated by realistic %, with a "Show all props" toggle.
   - Position = QB if 10+ attempts in a game; RB if more carries than targets; else WR/TE (`playerPos`).
 - Installable PWA: `manifest.json`, `sw.js` (network-first app shell), `icons/`.

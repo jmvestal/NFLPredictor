@@ -95,6 +95,13 @@ header nav button{flex:0 0 auto}
 .chips button{padding:5px 11px;border-radius:999px;font-size:13px}
 .chips button.active{background:var(--text);color:var(--bg);border-color:var(--text)}
 .chips button.now{border-color:var(--accent)}
+.toprow{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.toprow select{font-weight:600}
+nav.sub button{background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;padding:6px 10px;color:var(--muted)}
+nav.sub button.active{color:var(--text);border-bottom-color:var(--accent);background:transparent}
+nav.sub:empty{display:none}
+.soon{text-align:center;padding:60px 20px}
+.soon .big{font-size:56px}
 .sectionhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:14px 0 8px}
 .sectionhead h3{margin:0}
 @media (max-width:420px){.team{grid-template-columns:24px 1fr 42px 42px 50px 56px}}
@@ -102,24 +109,32 @@ header nav button{flex:0 0 auto}
 </head>
 <body>
 <header>
-  <h1>🏈 NFL <span>Predictor</span></h1>
-  <nav id="weekTabs" class="chips" aria-label="Week"></nav>
-  <nav id="secTabs" aria-label="Section">
-    <button data-tab="week" class="active">Games</button>
-    <button data-tab="pos-QB">QB</button>
-    <button data-tab="pos-RB">RB</button>
-    <button data-tab="pos-WR">WR/TE</button>
-    <button data-tab="props">Props</button>
-    <button data-tab="tracker">Tracker</button>
-    <button data-tab="picks">Model</button>
-    <button data-tab="teams">Teams</button>
+  <div class="toprow"><h1>🏆 Sports <span>Predictor</span></h1><select id="weekSel" title="Week"></select></div>
+  <nav id="sportTabs" class="chips" aria-label="Sport">
+    <button data-sport="NFL" class="active">🏈 NFL</button>
+    <button data-sport="NBA">🏀 NBA</button>
+    <button data-sport="MLB">⚾ MLB</button>
+    <button data-sport="NHL">🏒 NHL</button>
   </nav>
+  <nav id="secTabs" aria-label="Section">
+    <button data-sec="games" class="active">Games</button>
+    <button data-sec="players">Players</button>
+    <button data-sec="props">Props</button>
+    <button data-sec="teams">Teams</button>
+  </nav>
+  <nav id="subTabs" class="sub" aria-label="View"></nav>
 </header>
 <main>
   <div id="loading">
     <div id="loadmsg">Loading…</div>
     <div class="prog"><i id="progbar"></i></div>
   </div>
+
+  <section id="tab-soon" class="hidden">
+    <div class="soon"><div class="big" id="soonIcon">🏀</div><h2 id="soonTitle">NBA coming soon</h2>
+      <p class="muted">Only NFL is built so far. The same approach (a tested model, picks, player props and systems) can be added for this sport next.</p>
+      <button class="btn" onclick="setSport('NFL')">Back to NFL</button></div>
+  </section>
 
   <section id="tab-week" class="hidden">
     <div class="muted small" id="weekCardInfo" style="margin-bottom:10px"></div>
@@ -183,9 +198,11 @@ header nav button{flex:0 0 auto}
   </section>
 
   <section id="tab-teams" class="hidden">
-    <div class="bar"><span class="muted small" id="teamsInfo"></span></div>
+    <div class="bar"><span class="muted small" id="teamsInfo"></span><button class="btn sm" id="totalsBtn" onclick="showTotals = !showTotals; renderTeams()">Show season totals</button></div>
     <div class="tablewrap"><table id="teamsTbl"></table></div>
-    <div class="note" id="teamsNote">Off PPP = points scored ÷ own offensive plays. Def PPP = points allowed ÷ opponent offensive plays (lower is better). PPP and Plays/G blend this season with last season (see "Last-season games"); the GP, Pts and Plays columns are this season only. Points include defensive/special-teams scores.</div>
+    <div class="note" id="teamsNote"><b>Scores</b> = points the offense would score in a normal game against an average defense.
+      <b>Allows</b> = points the defense would give up against an average offense. <b>Margin</b> = Scores − Allows, how many points better than a typical opponent (tap any column to sort).<br>
+      Off PPP = points scored ÷ own offensive plays. Def PPP = points allowed ÷ opponent offensive plays (lower is better). PPP and Plays/G blend this season with last season (see "Last-season games"); the season totals are this season only, so dividing Pts by Plays won't match Off PPP. Points include defensive/special-teams scores.</div>
   </section>
 
   <section id="tab-props" class="hidden">
@@ -441,24 +458,51 @@ function predict(P, g, hfa, sd, qbPen, backup) {
 
 // ---- UI ----
 let S = null, P = null;
-let curTab = 'week', curWeek = null, posShowAll = false;
-document.querySelectorAll('#secTabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+// Navigation: sport → section → sub-tab. Internally the active view is the innermost tab id
+// (week, picks, pos-QB/RB/WR, props, tracker, teams), so each screen's render code is unchanged.
+const SECTIONS = {
+  games: [['week', 'Picks'], ['picks', 'Model']],
+  players: [['pos-QB', 'QB'], ['pos-RB', 'RB'], ['pos-WR', 'WR/TE']],
+  props: [['props', 'Props'], ['tracker', 'Tracker']],
+  teams: [['teams', 'Teams']],
+};
+const lastSub = {}; // remembers the sub-tab used in each section
+let curTab = 'week', curWeek = null, posShowAll = false, curSport = 'NFL';
+document.querySelectorAll('#secTabs button').forEach(b => b.onclick = () => showTab(lastSub[b.dataset.sec] || SECTIONS[b.dataset.sec][0][0]));
+document.querySelectorAll('#sportTabs button').forEach(b => b.onclick = () => setSport(b.dataset.sport));
+const sectionOf = t => Object.keys(SECTIONS).find(k => SECTIONS[k].some(([id]) => id === t)) || 'games';
 function showTab(t) {
   curTab = t;
+  const sec = sectionOf(t);
+  lastSub[sec] = t;
   try { localStorage.setItem(`${CACHE_V}:tab`, t); } catch {}
-  document.querySelectorAll('#secTabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
-  const sec = t.startsWith('pos-') ? 'pos' : t;
-  for (const s of ['week', 'pos', 'picks', 'teams', 'props', 'tracker']) $('tab-' + s).classList.toggle('hidden', s !== sec);
+  document.querySelectorAll('#secTabs button').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
+  const subs = SECTIONS[sec];
+  $('subTabs').innerHTML = subs.length > 1 ? subs.map(([id, label]) => `<button data-tab="${id}" class="${id === t ? 'active' : ''}">${label}</button>`).join('') : '';
+  $('subTabs').querySelectorAll('button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+  const view = t.startsWith('pos-') ? 'pos' : t;
+  for (const v of ['soon', 'week', 'pos', 'picks', 'teams', 'props', 'tracker']) $('tab-' + v).classList.toggle('hidden', v !== view);
   if (t === 'tracker') renderTracker();
-  if (sec === 'pos') renderPosition(t.slice(4));
+  if (view === 'pos') renderPosition(t.slice(4));
   window.scrollTo(0, 0);
+}
+// Only NFL is built; other sports show a placeholder (and the app always reopens on NFL)
+function setSport(sp) {
+  curSport = sp;
+  document.querySelectorAll('#sportTabs button').forEach(b => b.classList.toggle('active', b.dataset.sport === sp));
+  const nfl = sp === 'NFL';
+  for (const id of ['secTabs', 'subTabs', 'weekSel']) $(id).classList.toggle('hidden', !nfl);
+  if (nfl) return showTab(curTab);
+  for (const v of ['week', 'pos', 'picks', 'teams', 'props', 'tracker']) $('tab-' + v).classList.add('hidden');
+  $('tab-soon').classList.remove('hidden');
+  $('soonIcon').textContent = { NBA: '🏀', MLB: '⚾', NHL: '🏒' }[sp];
+  $('soonTitle').textContent = `${sp} coming soon`;
 }
 
 function selectedWeek() { return curWeek; }
 function setWeek(w) {
   curWeek = w;
-  document.querySelectorAll('#weekTabs button').forEach(b => b.classList.toggle('active', +b.dataset.week === w));
-  document.querySelector(`#weekTabs button[data-week="${w}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  $('weekSel').value = w;
   renderAll();
   loadWeekExtras(w).then(renderAll);
 }
@@ -564,22 +608,43 @@ function renderGames() {
   renderTeams();
 }
 
-let sortK = 'offPPP', sortDir = -1;
+let sortK = 'margin', sortDir = -1;
+let showTotals = false;
 function renderTeams() {
-  const rows = Object.values(P.teams).map(r => ({ ...r, t: S.teams[r.id], net: r.offPPP - r.defPPP }));
+  // Points in a normal game, using the model's own formula against a league-average opponent:
+  // Scores = avg(team Off PPP, league PPP) × team plays/game; Allows = avg(league PPP, team Def PPP) × league plays/game
+  const list = Object.values(P.teams).filter(r => r.gp > 0 || r.prevGames);
+  const lgPlays = list.reduce((a, r) => a + r.playsPG, 0) / list.length;
+  const rows = list.map(r => {
+    const scores = (r.offPPP + P.leaguePPP) / 2 * r.playsPG, allows = (P.leaguePPP + r.defPPP) / 2 * lgPlays;
+    return { ...r, t: S.teams[r.id], net: r.offPPP - r.defPPP, scores, allows, margin: scores - allows };
+  });
   rows.sort((a, b) => (sortK === 'name' ? a.t.abbr.localeCompare(b.t.abbr) : a[sortK] - b[sortK]) * sortDir);
-  const cols = [['rank', '#'], ['name', 'Team'], ['gp', 'GP'], ['offPPP', 'Off PPP'], ['defPPP', 'Def PPP'], ['net', 'Net PPP'], ['playsPG', 'Plays/G'], ['ptsFor', 'Pts'], ['offPlays', 'Off Plays'], ['ptsAg', 'Pts Allowed'], ['defPlays', 'Def Plays']];
+  const TIPS = {
+    scores: 'Points this offense scores in a normal game against an average defense',
+    allows: 'Points this defense allows in a normal game against an average offense (lower is better)',
+    margin: 'Scores minus Allows: how many points better than a typical opponent',
+    offPPP: 'Points scored per offensive play (includes 4 games of last season)',
+    defPPP: 'Points allowed per opponent play, lower is better (includes 4 games of last season)',
+    playsPG: 'Offensive plays per game', gp: 'Games played this season', ptsFor: 'Points scored this season', offPlays: 'Offensive plays this season',
+    ptsAg: 'Points allowed this season', defPlays: 'Opponent plays this season',
+  };
+  const cols = [['rank', '#'], ['name', 'Team'], ['scores', 'Scores'], ['allows', 'Allows'], ['margin', 'Margin'], ['offPPP', 'Off PPP'], ['defPPP', 'Def PPP'], ['playsPG', 'Plays/G'],
+    ...(showTotals ? [['gp', 'GP'], ['ptsFor', 'Pts'], ['offPlays', 'Off Plays'], ['ptsAg', 'Pts Allowed'], ['defPlays', 'Def Plays']] : [])];
+  rows.sort((a, b) => (sortK === 'name' ? a.t.abbr.localeCompare(b.t.abbr) : a[sortK] - b[sortK]) * sortDir);
   const lg = P.leaguePPP;
-  $('teamsTbl').innerHTML = `<tr>${cols.map(([k, l]) => `<th data-k="${k}">${l}${k === sortK ? (sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('')}</tr>` +
-    rows.map((r, i) => `<tr><td>${i + 1}</td><td><img src="${r.t.logo}" style="width:18px;vertical-align:middle;margin-right:6px">${r.t.name} <span class="muted small">${r.w}-${r.l}${r.tie ? '-' + r.tie : ''}</span></td>
-      <td>${r.gp}</td><td class="${r.offPPP >= lg ? 'pos' : 'neg'}">${r.offPPP.toFixed(3)}</td><td class="${r.defPPP <= lg ? 'pos' : 'neg'}">${r.defPPP.toFixed(3)}</td>
-      <td class="${r.net >= 0 ? 'pos' : 'neg'}">${sgn(r.net, 3)}</td><td>${f1(r.playsPG)}</td><td>${r.ptsFor}</td><td>${r.offPlays}</td><td>${r.ptsAg}</td><td>${r.defPlays}</td></tr>`).join('');
+  $('teamsTbl').innerHTML = `<tr>${cols.map(([k, l]) => `<th data-k="${k}" title="${TIPS[k] || ''}">${l}${k === sortK ? (sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('')}</tr>` +
+    rows.map((r, i) => `<tr><td>${i + 1}</td><td><img src="${r.t.logo}" style="width:18px;vertical-align:middle;margin-right:6px">${r.t.abbr} <span class="muted small">${r.w}-${r.l}${r.tie ? '-' + r.tie : ''}</span></td>
+      <td>${f1(r.scores)}</td><td>${f1(r.allows)}</td><td class="${r.margin >= 0 ? 'pos' : 'neg'}"><b>${sgn(r.margin)}</b></td>
+      <td class="${r.offPPP >= lg ? 'pos' : 'neg'}">${r.offPPP.toFixed(3)}</td><td class="${r.defPPP <= lg ? 'pos' : 'neg'}">${r.defPPP.toFixed(3)}</td><td>${f1(r.playsPG)}</td>` +
+      (showTotals ? `<td>${r.gp}</td><td>${r.ptsFor}</td><td>${r.offPlays}</td><td>${r.ptsAg}</td><td>${r.defPlays}</td>` : '') + `</tr>`).join('');
   $('teamsTbl').querySelectorAll('th').forEach(th => th.onclick = () => {
     const k = th.dataset.k; if (k === 'rank') return;
-    sortDir = sortK === k ? -sortDir : (k === 'defPPP' || k === 'ptsAg' || k === 'name' ? 1 : -1); sortK = k;
+    sortDir = sortK === k ? -sortDir : (k === 'defPPP' || k === 'allows' || k === 'ptsAg' || k === 'name' ? 1 : -1); sortK = k;
     renderTeams();
   });
-  $('teamsInfo').textContent = `Through week ${selectedWeek() - 1} · league average ${lg.toFixed(3)} PPP`;
+  $('teamsInfo').innerHTML = `Through week ${selectedWeek() - 1} · league average ${lg.toFixed(3)} points per play, ${f1(lgPlays)} plays per game`;
+  $('totalsBtn').textContent = showTotals ? 'Hide season totals' : 'Show season totals';
 }
 
 // ===================== PLAYER PROPS =====================
@@ -1186,8 +1251,9 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.ser
     S = await loadAll();
     const weeks = [...new Set(S.games.map(g => g.week))].filter(w => w >= 2).sort((a, b) => a - b);
     curWeek = S.nextWeek;
-    $('weekTabs').innerHTML = weeks.map(w => `<button data-week="${w}" class="${w === S.nextWeek ? 'active now' : ''}" title="${w === S.nextWeek ? 'This week' : ''}">Wk ${w}</button>`).join('');
-    $('weekTabs').querySelectorAll('button').forEach(b => b.onclick = () => setWeek(+b.dataset.week));
+    $('weekSel').innerHTML = weeks.map(w => `<option value="${w}">Week ${w}${w === S.nextWeek ? ' (this week)' : ''}</option>`).join('');
+    $('weekSel').value = curWeek;
+    $('weekSel').onchange = () => setWeek(+$('weekSel').value);
     $('posAllBtn').onclick = () => { posShowAll = !posShowAll; renderPosition(curTab.slice(4)); };
     prepareProps();
     for (const id of ['prevIn', 'qbIn', 'hfaIn', 'sdIn', 'valueOnly']) $(id).onchange = renderAll;
@@ -1203,8 +1269,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.ser
     try { Object.keys(localStorage).filter(k => /^nflp\d+:/.test(k) && !k.startsWith(CACHE_V + ':')).forEach(k => localStorage.removeItem(k)); } catch {}
     $('loading').classList.add('hidden');
     let startTab = 'week'; try { startTab = localStorage.getItem(`${CACHE_V}:tab`) || 'week'; } catch {}
-    showTab(document.querySelector(`#secTabs button[data-tab="${startTab}"]`) ? startTab : 'week');
-    document.querySelector('#weekTabs button.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    showTab(Object.values(SECTIONS).some(l => l.some(([id]) => id === startTab)) ? startTab : 'week');
   } catch (err) {
     $('loadmsg').innerHTML = `<span class="neg">Couldn't reach ESPN (${err.message}). Check your internet connection.</span> <button class="btn sm" onclick="location.reload()">Retry</button>`;
     console.error(err);
