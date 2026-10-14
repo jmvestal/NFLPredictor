@@ -128,6 +128,14 @@ Tuned on 2021-23, tested on 2024-26 (weeks 2+):
 - `data/season-YYYY.json` now also stores closing lines (`odds`, from nflverse) so past weeks show the pick that would have been made. Weeks 2-5 of 2026: 38-24 (61.3%) vs 33-28 for the old model-only picks.
 - The app fetches the snapshot with `cache: 'no-cache'` (a stale HTTP cache hid updated data).
 
+## Price checker (2026-10-14)
+
+- "$ Check" on system bets, position-tab props and game-card props; tapping a ladder rung opens it too. `pc(key, ctx)` registers the context; `openPriceCheck` / `renderPriceCheck` show it.
+- "True" = system tested win rate (rb30 .898, qbtd .866, wr3 .924) for systems, the realistic % for DK props, and the model % for ladder rungs.
+- Price sources (`PC_SOURCES`): Sportsbook and Novig take American odds; Kalshi and Polymarket take the "Yes" price in cents. Fees aren't included.
+- Verdict: edge ≥ 1.5% ✅ Bet · 0–1.5% ⚠️ Thin · < 0 ❌ Skip. "+ Track at" saves the bet to the Tracker at the entered price.
+- Entered prices are saved per bet (`nflp3:prices`). The "ⓘ Implied vs true" popup (`#oddsHelp`) explains it all.
+
 ## Ladders tab and the same-game parlay test (2026-10-14)
 
 - **Props → Ladders** (`renderLadder`): per QB / RB (8+ carries/g) / WR-TE (15%+ target share), LINEMAKER's inputs plus ours.
