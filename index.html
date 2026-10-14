@@ -191,6 +191,7 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.6)}
       <button class="btn sm" onclick="copyNovigReport()">📋 Copy report</button>
     </div>
     <div id="opStatus" class="pcresult">No key saved yet.</div>
+    <div class="muted small" style="margin-top:12px;text-align:center">App version <b id="appVersion"></b> · if a new feature is missing, close the app completely and reopen it twice</div>
   </dialog>
 
   <dialog id="priceCheck" class="sheet" aria-label="Price check">
@@ -1526,7 +1527,9 @@ function nvBadge(price, trueP) {
 }
 
 // ---------- settings ----------
+const APP_VERSION = '2026-10-14 · 13 (bet amounts)'; // bump with sw.js CACHE so the user can confirm an update arrived
 function openSettings() {
+  $('appVersion').textContent = APP_VERSION;
   $('opKeyIn').value = opKey() ? '••••••••' : '';
   $('useNovig').checked = useNovig();
   $('useNovig').onchange = () => { store.set(`${CACHE_V}:useNovig`, $('useNovig').checked); renderAll(); };
