@@ -199,7 +199,9 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.6)}
         <span class="math">−400 → 400 ÷ 500 = <b>80%</b> · −150 → 150 ÷ 250 = <b>60%</b></span>
         <div class="why" style="margin-top:6px">Plus odds (underdogs): 100 ÷ (odds + 100).</div>
         <span class="math">+150 → 100 ÷ 250 = <b>40%</b> · +300 → 100 ÷ 400 = <b>25%</b></span>
-        <div class="why" style="margin-top:6px">Kalshi and Polymarket show it directly: 80¢ = 80%. Novig shows American odds like a sportsbook, but without the sportsbook's built-in cut.</div></div></div>
+        <div class="why" style="margin-top:6px">Kalshi and Polymarket show it directly: 80¢ = 80%.</div>
+        <div class="why" style="margin-top:6px">Decimal odds (Novig shows these): 1 ÷ the odds.</div>
+        <span class="math">1.25 → 1 ÷ 1.25 = <b>80%</b> · 1.77 → <b>56.5%</b> · 2.50 → <b>40%</b></span></div></div>
       <div class="step"><div class="n">2</div><div><div class="t">Compare it to the true chance</div>
         <div class="why">At −400 you risk $400 to win $100, so the bet must win more than 80% of the time to make money.</div>
         <span class="math">True 88% − implied 80% = <b>+8% edge</b> ✅</span><br>
@@ -1340,10 +1342,10 @@ function parsePrice(str) {
 // Where the price comes from: prediction markets (Kalshi, Polymarket) quote the "Yes" price in cents;
 // sportsbooks and Novig (a no-vig exchange) quote American odds.
 const PC_SOURCES = {
-  book: { name: 'Sportsbook', cents: false, ph: '-500', hint: 'Type the American odds, e.g. −500 or +120.' },
+  book: { name: 'Sportsbook', cents: false, ph: '-500', hint: 'Type the odds as shown: American (−500, +120) or decimal (1.20, 2.50).' },
   kalshi: { name: 'Kalshi', cents: true, ph: '82', hint: 'Type the "Yes" price in cents, e.g. 82 for 82¢ (= 82%). Kalshi charges a small trading fee that isn\'t included here.' },
   poly: { name: 'Polymarket', cents: true, ph: '82', hint: 'Type the "Yes" price in cents, e.g. 82 for 82¢ (= 82%). Any trading fees aren\'t included here.' },
-  novig: { name: 'Novig', cents: false, ph: '-450', hint: 'Type the American odds Novig shows, e.g. −450 or +120. Novig has no built-in sportsbook cut, so prices are usually better than a sportsbook\'s.' },
+  novig: { name: 'Novig', cents: false, ph: '1.77', hint: 'Type the decimal odds Novig shows, e.g. 1.77 (1 ÷ 1.77 = 56.5%). American odds like −130 also work. Novig has no built-in sportsbook cut, so prices are usually better than a sportsbook\'s.' },
 };
 let pcSource = store.get(`${CACHE_V}:pcSource`) || 'book';
 document.querySelectorAll('#pcSource button').forEach(b => b.onclick = () => { pcSource = b.dataset.src; store.set(`${CACHE_V}:pcSource`, pcSource); syncPcSource(); renderPriceCheck(); });
@@ -1364,9 +1366,18 @@ function parseFromSource(str, srcKey) {
     const prob = v > 0 && v < 1 ? v : v >= 1 && v < 100 ? v / 100 : null;
     return prob == null ? null : { implied: prob, odds: probToMl(prob), cents: Math.round(prob * 100) };
   }
-  const pr = parsePrice(t); // American odds (also accepts ¢ if typed explicitly)
-  if (!pr || (pr.kind === 'kalshi' && !/[¢c]/i.test(t))) return null;
-  return pr;
+  if (/[¢c]$/i.test(t)) return parsePrice(t); // cents typed explicitly
+  const v = parseFloat(t);
+  if (!isFinite(v)) return null;
+  if (/^[+-]/.test(t) || Math.abs(v) >= 100) { // American odds
+    const pr = parsePrice(t);
+    return pr && pr.kind === 'american' ? pr : null;
+  }
+  if (v > 1 && v < 100) { // decimal odds: payout per $1 including the stake (1.77 → 56.5%)
+    const american = v >= 2 ? (v - 1) * 100 : -100 / (v - 1);
+    return { implied: 1 / v, odds: american, decimal: v, kind: 'decimal' };
+  }
+  return null;
 }
 const PC_CTX = {};
 const pcSaved = store.get(`${CACHE_V}:prices`) || {};
@@ -1395,10 +1406,10 @@ function renderPriceCheck() {
   const src = PC_SOURCES[pcSource], raw = $('pcOdds').value, pr = parseFromSource(raw, pcSource), box = $('pcResult');
   if (raw.trim()) { pcSaved[pcKey] = { v: raw.trim(), src: pcSource }; store.set(`${CACHE_V}:prices`, pcSaved); }
   const fairP = Math.min(0.99, Math.max(0.01, c.trueP));
-  const fairTxt = src.cents ? `${Math.floor(fairP * 100)}¢` : fmtMl(probToMl(fairP));
+  const fairTxt = src.cents ? `${Math.floor(fairP * 100)}¢` : pcSource === 'novig' ? `${(1 / fairP).toFixed(2)}</b> (same as ${fmtMl(probToMl(fairP))})<b>` : fmtMl(probToMl(fairP));
   if (!pr) {
     box.className = 'pcresult';
-    box.innerHTML = raw.trim() ? `<span class="neg">Couldn't read that price.</span> ${src.hint}` : `Enter your ${src.name} price to see if it's worth it. Anything ${src.cents ? 'below' : 'better than'} <b>${fairTxt}</b> has an edge.`;
+    box.innerHTML = raw.trim() ? `<span class="neg">Couldn't read that price.</span> ${src.hint}` : `Enter your ${src.name} price to see if it's worth it. Anything ${src.cents ? 'below' : pcSource === 'novig' ? 'higher than' : 'better than'} <b>${fairTxt}</b> has an edge.`;
     $('pcTrack').innerHTML = '';
     return;
   }
@@ -1410,7 +1421,7 @@ function renderPriceCheck() {
     <div class="pcfacts" style="margin:0"><span>Implied (${src.name}'s chance)</span><span>${pct(pr.implied)}</span>
     <span>True (${c.trueShort || 'our estimate'})</span><span>${pct(c.trueP)}</span>
     <span><b>Edge</b></span><span class="${edge >= 0 ? 'pos' : 'neg'}">${edge >= 0 ? '+' : ''}${(edge * 100).toFixed(1)}%</span></div>
-    <div class="why" style="margin-top:6px">At ${src.cents ? `${pr.cents}¢ on ${src.name} (same as ${fmtMl(Math.round(pr.odds))})` : `${fmtMl(pr.odds)} on ${src.name}`} you ${risk}. It must win ${pct(pr.implied)} of the time to break even; we estimate ${pct(c.trueP)}.
+    <div class="why" style="margin-top:6px">At ${src.cents ? `${pr.cents}¢ on ${src.name} (same as ${fmtMl(Math.round(pr.odds))})` : pr.kind === 'decimal' ? `${pr.decimal} on ${src.name} (same as ${fmtMl(Math.round(pr.odds))})` : `${fmtMl(pr.odds)} on ${src.name}`} you ${risk}. It must win ${pct(pr.implied)} of the time to break even; we estimate ${pct(c.trueP)}.
     ${edge < 0 ? 'Even though it usually wins, this price loses money over time.' : edge < 0.015 ? 'Barely worth it. A small move in the price erases the edge.' : 'This price beats the fair price.'}</div>`;
   if (c.track && !c.final) {
     const on = tracker.some(t => t.key === pcKey);
