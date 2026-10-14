@@ -134,7 +134,9 @@ Tuned on 2021-23, tested on 2024-26 (weeks 2+):
 - "True" = system tested win rate (rb30 .898, qbtd .866, wr3 .924) for systems, the realistic % for DK props, and the model % for ladder rungs.
 - Price sources (`PC_SOURCES`): Sportsbook and Novig take American odds; Kalshi and Polymarket take the "Yes" price in cents. Fees aren't included.
 - Verdict: edge ≥ 1.5% ✅ Bet · 0–1.5% ⚠️ Thin · < 0 ❌ Skip. "+ Track at" saves the bet to the Tracker at the entered price.
-- Entered prices are saved per bet (`nflp3:prices`). The "ⓘ Implied vs true" popup (`#oddsHelp`) explains it all.
+- Props and ladder rungs carry the player's projected distribution (`ctx.dist`), so the user can type the line their app shows (milestone style "13+" = Over 12.5; Yes/Over or No/Under). True probability is recomputed for that line (realistic transform for DK props, raw model for ladders). The DK "Over 13.5" opens as 14+.
+- "🚫 Not on my app" hides a player from props, ladders and systems (`nflp3:hiddenPlayers`, "show again" link). Receptions lines ≤ 0.5 are dropped from recommendations.
+- Entered prices and lines are saved per bet (`nflp3:prices`). The "ⓘ Implied vs true" popup (`#oddsHelp`) explains it all.
 
 ## Ladders tab and the same-game parlay test (2026-10-14)
 
