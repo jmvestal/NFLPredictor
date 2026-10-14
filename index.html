@@ -210,6 +210,9 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.6)}
       <input id="pcOdds" type="text" inputmode="text" placeholder="-500" autocomplete="off">
     </label>
     <div class="muted small" id="pcHint"></div>
+    <label class="pcinput" style="margin-top:8px">Bet amount ($)
+      <input id="pcStake" type="number" inputmode="decimal" min="0" step="1" placeholder="10">
+    </label>
     <div id="pcResult" class="pcresult"></div>
     <div class="bar" style="margin-top:10px"><span id="pcTrack"></span><button class="btn sm" onclick="openOddsHelp()">ⓘ What do these mean?</button>
       <button class="btn sm" id="pcHide" onclick="hideCurrentPlayer()">🚫 Not on my app</button></div>
@@ -1699,6 +1702,8 @@ function openPriceCheck(key) {
   else if (c.novig) { pcSource = 'novig'; $('pcOdds').value = String(c.novig); } // Novig's live price for this exact bet
   else $('pcOdds').value = typeof saved === 'string' ? saved : '';
   pcLine = c.dist ? { n: saved?.n ?? c.dist.n, side: saved?.side ?? c.dist.side } : null;
+  $('pcStake').value = saved?.stake ?? (parseFloat($('stakeIn').value) || 10);
+  $('pcStake').oninput = renderPriceCheck;
   $('pcLineRow').classList.toggle('hidden', !c.dist);
   $('pcHide').classList.toggle('hidden', !c.dist && !c.pid);
   if (c.dist) {
@@ -1726,7 +1731,7 @@ function renderPriceCheck() {
   const fairTxt = src.cents ? `${Math.floor(fairP * 100)}¢` : pcSource === 'novig' ? `${(1 / fairP).toFixed(2)}</b> (same as ${fmtMl(probToMl(fairP))})<b>` : fmtMl(probToMl(fairP));
   $('pcFacts').innerHTML = stt.facts.map(([l, v, cls]) => `<span class="${cls ? '' : 'muted'}">${l}</span><span class="${cls || 'muted'}">${v}</span>`).join('') +
     `<span>Fair price (no edge)</span><span>${src.cents ? `${Math.floor(fairP * 100)}¢` : pcSource === 'novig' ? `${(1 / fairP).toFixed(2)} (${fmtMl(probToMl(fairP))})` : fmtMl(probToMl(fairP))}</span>`;
-  if (raw.trim() || pcLine) { pcSaved[pcKey] = { v: raw.trim(), src: pcSource, ...(pcLine || {}) }; store.set(`${CACHE_V}:prices`, pcSaved); }
+  if (raw.trim() || pcLine) { pcSaved[pcKey] = { v: raw.trim(), src: pcSource, stake: parseFloat($('pcStake').value) || undefined, ...(pcLine || {}) }; store.set(`${CACHE_V}:prices`, pcSaved); }
   if (!pr) {
     box.className = 'pcresult';
     box.innerHTML = raw.trim() ? `<span class="neg">Couldn't read that price.</span> ${src.hint}` : `Enter your ${src.name} price to see if it's worth it. Anything ${src.cents ? 'below' : pcSource === 'novig' ? 'higher than' : 'better than'} <b>${fairTxt}</b> has an edge.`;
@@ -1736,16 +1741,27 @@ function renderPriceCheck() {
   const edge = stt.trueP - pr.implied;
   const [cls, verdict] = edge >= 0.015 ? ['good', '✅ Bet'] : edge >= 0 ? ['thin', '⚠️ Thin edge'] : ['bad', '❌ Skip'];
   const risk = pr.odds < 0 ? `risk $${Math.round(-pr.odds)} to win $100` : `risk $100 to win $${Math.round(pr.odds)}`;
+  // payout for the user's bet: profit per $1 = 1/implied - 1 (works for American, decimal and cents prices; fees not included)
+  const stake = parseFloat($('pcStake').value) || 0;
+  const perDollar = 1 / pr.implied - 1, win = stake * perDollar, ev = stake * (stt.trueP * perDollar - (1 - stt.trueP));
+  const money = v => (v < 0 ? '−$' : '$') + Math.abs(v).toFixed(2);
+  const payout = stake > 0 ? `<div class="pcfacts" style="margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line)">
+      <span>Bet</span><span>${money(stake)}</span>
+      <span><b>To win</b> (if it hits)</span><span class="pos">${money(win)}</span>
+      <span>Total back</span><span>${money(stake + win)}</span>
+      <span>Lose (if it misses)</span><span class="neg">−${money(stake).replace('$', '$')}</span>
+      <span>Expected profit (average)</span><span class="${ev >= 0 ? 'pos' : 'neg'}">${ev >= 0 ? '+' : ''}${money(ev)}</span></div>
+    <div class="muted small" style="margin-top:4px">"Expected profit" = what this bet earns on average if you made it many times, using our true chance. Any single bet either wins ${money(win)} or loses ${money(stake)}.</div>` : '';
   box.className = 'pcresult ' + cls;
   box.innerHTML = `<div class="verdict">${verdict}</div>
     <div class="pcfacts" style="margin:0"><span>Implied (${src.name}'s chance)</span><span>${pct(pr.implied)}</span>
     <span>True (${c.dist ? (c.dist.trust != null ? 'realistic chance' : 'our model') : c.trueShort || 'our estimate'})</span><span>${pct(stt.trueP)}</span>
     <span><b>Edge</b></span><span class="${edge >= 0 ? 'pos' : 'neg'}">${edge >= 0 ? '+' : ''}${(edge * 100).toFixed(1)}%</span></div>
     <div class="why" style="margin-top:6px">At ${src.cents ? `${pr.cents}¢ on ${src.name} (same as ${fmtMl(Math.round(pr.odds))})` : pr.kind === 'decimal' ? `${pr.decimal} on ${src.name} (same as ${fmtMl(Math.round(pr.odds))})` : `${fmtMl(pr.odds)} on ${src.name}`} you ${risk}. It must win ${pct(pr.implied)} of the time to break even; we estimate ${pct(stt.trueP)}.
-    ${edge < 0 ? 'Even though it usually wins, this price loses money over time.' : edge < 0.015 ? 'Barely worth it. A small move in the price erases the edge.' : 'This price beats the fair price.'}</div>`;
+    ${edge < 0 ? 'Even though it usually wins, this price loses money over time.' : edge < 0.015 ? 'Barely worth it. A small move in the price erases the edge.' : 'This price beats the fair price.'}</div>${payout}`;
   if (stt.track && !c.final) {
     const t = tracker.find(x => x.key === stt.trackKey);
-    $('pcTrack').innerHTML = `<button class="btn sm ${t ? 'done' : ''}" onclick="trackAtPrice()">${t ? '✓ Tracked at ' + fmtMl(t.odds) : '+ Track at ' + fmtMl(Math.round(pr.odds))}</button>`;
+    $('pcTrack').innerHTML = `<button class="btn sm ${t ? 'done' : ''}" onclick="trackAtPrice()">${t ? `✓ Tracked: $${t.stake} at ${fmtMl(t.odds)}` : `+ Track${stake > 0 ? ' $' + stake : ''} at ${fmtMl(Math.round(pr.odds))}`}</button>`;
   } else $('pcTrack').innerHTML = '';
 }
 function trackAtPrice() {
@@ -1754,8 +1770,9 @@ function trackAtPrice() {
   const stt = pcState(c);
   if (!stt.track) return;
   const i = tracker.findIndex(t => t.key === stt.trackKey);
-  if (i >= 0) tracker[i].odds = Math.round(pr.odds);
-  else tracker.push({ ...stt.track, label: `${stt.track.label} · ${PC_SOURCES[pcSource].name}`, odds: Math.round(pr.odds), key: stt.trackKey, season: S.season, stake: parseFloat($('stakeIn').value) || 10, ts: Date.now() });
+  const stake = parseFloat($('pcStake').value) || parseFloat($('stakeIn').value) || 10;
+  if (i >= 0) { tracker[i].odds = Math.round(pr.odds); tracker[i].stake = stake; }
+  else tracker.push({ ...stt.track, label: `${stt.track.label} · ${PC_SOURCES[pcSource].name}`, odds: Math.round(pr.odds), key: stt.trackKey, season: S.season, stake, ts: Date.now() });
   saveTracker(); renderPriceCheck(); renderAll();
 }
 
@@ -2037,10 +2054,11 @@ function renderTracker() {
     <td>Wk ${t.week}</td><td>${t.label}</td>
     <td><input type="number" style="width:70px" value="${t.odds}" onchange="editTrack(${i},'odds',this.value)"></td>
     <td><input type="number" style="width:60px" value="${t.stake}" onchange="editTrack(${i},'stake',this.value)"></td>
+    <td class="muted">${money(t.stake * mlProfit(t.odds) / 100)}</td>
     <td class="${res === 'Win' ? 'pos' : res === 'Loss' ? 'neg' : 'muted'}">${res}${actual != null ? ` (${actual})` : ''}</td>
     <td class="${profitOf(t, res) > 0 ? 'pos' : profitOf(t, res) < 0 ? 'neg' : 'muted'}">${res === 'Pending' ? '—' : money(profitOf(t, res))}</td>
     <td><button class="btn sm" onclick="removeTrack(${i})">✕</button></td></tr>`);
-  $('trackTbl').innerHTML = rows.length ? '<tr><th>Week</th><th>Pick</th><th>Odds</th><th>Bet $</th><th>Result</th><th>Profit</th><th></th></tr>' + rows.join('')
+  $('trackTbl').innerHTML = rows.length ? '<tr><th>Week</th><th>Pick</th><th>Odds</th><th>Bet $</th><th>To win</th><th>Result</th><th>Profit</th><th></th></tr>' + rows.join('')
     : '<tr><td class="muted">No picks tracked yet. Use the + Track buttons on This Week or Player Props.</td></tr>';
 }
 
