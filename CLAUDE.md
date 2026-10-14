@@ -108,6 +108,26 @@ To refit: `node props.js tune` writes `props_params.json`. Then re-export to `pr
 - After changing `index.html`, bump `CACHE` in `sw.js` (e.g. `nflp-shell-v2`) so installed phone apps pick up the new version.
 - Weekly: `cd backtest && node build_snapshot.js 2025,2026` refreshes `data/season-*.json` (needs the fetch caches). Then commit and push.
 
+## Game-pick accuracy work (2026-10-14, backtest/gamepicks.js, gamepicks_tiers.js)
+
+Tuned on 2021-23, tested on 2024-26 (weeks 2+):
+
+| Version | Test winners | Brier | Margin err |
+|---|---|---|---|
+| App model (PPP + 4 games last season + backup-QB −3) | 63.9% | .2237 | 10.31 |
+| + recent-form decay 0.95 | 64.3% | .2238 | 10.30 |
+| + strength of schedule (adj 1) | 64.9% | .2234 | 10.34 (mixed: up 3 seasons, down 3) |
+| **Vegas spread alone** | **66.8%** | **.2105** | **9.77** |
+| Best blend (20% model / 80% Vegas) | 66.6% | .2111 | 9.82 |
+
+- The closing line is the most accurate predictor, and blending our model in doesn't beat it.
+- Our model adds information only in the 60-70% Vegas band: favorites won 67% when the model agreed (≥ 60%) and 59% when it disagreed. This held in 2021-23 and 2024-26.
+- **Games → Picks now always picks the Vegas favorite**, labeled by Vegas no-vig %: LOCK 80%+ (87%) · STRONG 70-80 (75%) · GOOD 60-70 (64%; 67%/59% with/without model agreement) · LEAN 55-60 (60%) · TOSS-UP < 55 (coin flip). If there's no line, it falls back to our model ("MODEL").
+  - The big score is the Vegas-implied score (total/2 ∓ spread/2), with our model's score underneath.
+  - The moneyline BET advice (`gameCall`) is unchanged.
+- `data/season-YYYY.json` now also stores closing lines (`odds`, from nflverse) so past weeks show the pick that would have been made. Weeks 2-5 of 2026: 38-24 (61.3%) vs 33-28 for the old model-only picks.
+- The app fetches the snapshot with `cache: 'no-cache'` (a stale HTTP cache hid updated data).
+
 ## Navigation and phone app (latest)
 
 - Header rows (rebuilt on the work PC 2026-10-14 from the Mac session's description):

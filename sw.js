@@ -1,7 +1,7 @@
 // Service worker: lets the installed app open fast and without signal.
 // Same-origin files are network-first (so updates show up right away) with a cached fallback.
 // ESPN data is never cached here; the app keeps its own cache in localStorage.
-const CACHE = 'nflp-shell-v4';
+const CACHE = 'nflp-shell-v5';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png',
   'data/season-2025.json', 'data/season-2026.json'];
 

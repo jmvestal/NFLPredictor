@@ -156,10 +156,14 @@ dialog#teamsHelp::backdrop{background:rgba(0,0,0,.6)}
     <div class="muted small" id="weekCardInfo" style="margin-bottom:10px"></div>
     <div class="grid" id="weekCards"></div>
     <div class="note">
-      <b>How the labels work</b> (from testing every game 2021–2025 plus this season):<br>
-      <span class="tag pick">PICK</span> the model and Vegas agree on the winner and the model is 60%+ sure: these won about 74% of the time.
-      <span class="tag lean">LEAN</span> they agree, but the model is 55–60%: about 62%.
-      <span class="tag skip">SKIP</span> toss-ups, games where the model picks the underdog (43%), and Thursday games (the model's weakest spot).<br>
+      <b>How the picks work</b> (tested on every game 2021–2026): the pick is always the Vegas favorite, because that was right more often (66.8%) than our model (63.9%) or any blend of the two.
+      The label is how strong a favorite Vegas makes them, with how often those picks actually won:
+      <span class="tag pick">LOCK</span> 80%+ → 87% ·
+      <span class="tag pick">STRONG</span> 70–80% → 75% ·
+      <span class="tag lean">GOOD</span> 60–70% → 64% (67% when our model agrees, 59% when it doesn't) ·
+      <span class="tag lean">LEAN</span> 55–60% → 60% ·
+      <span class="tag skip">TOSS-UP</span> under 55% → coin flip.<br>
+      The big score is the <b>best estimate</b> from the Vegas spread and total (about 9.8 points off on average vs 10.3 for our model); our model's score is underneath.<br>
       <b>Moneyline bet</b> is only suggested for PICKs at 60–65% from Week 6 on, the one group that made money in testing (+2–4%). Bigger favorites win more often but cost too much to profit.
       <b>Spreads and totals</b> never showed a reliable edge, so none are suggested.<br>
       <b>Systems</b> and position-by-position props are in the <b>QB</b>, <b>RB</b> and <b>WR/TE</b> tabs.<br>
@@ -264,7 +268,7 @@ const store = {
   get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
-const getJSON = url => fetch(url).then(r => { if (!r.ok) throw new Error(r.status + ' ' + url); return r.json(); });
+const getJSON = (url, opts) => fetch(url, opts).then(r => { if (!r.ok) throw new Error(r.status + ' ' + url); return r.json(); });
 const $ = id => document.getElementById(id);
 const pct = p => (p * 100).toFixed(1) + '%';
 const f1 = x => x.toFixed(1);
@@ -338,7 +342,7 @@ async function loadSeason(season, teams, label, p0, p1) {
   // bundled snapshot (data/season-YYYY.json, built by backtest/build_snapshot.js) covers finished games, so
   // only games played since the last update need full ESPN box score downloads (important on a phone)
   try {
-    const snap = await getJSON(`data/season-${season}.json`);
+    const snap = await getJSON(`data/season-${season}.json`, { cache: 'no-cache' }); // always check for a newer weekly snapshot
     for (const g of games) {
       if (!g.final) continue;
       const pl = snap.plays[g.id], pp = snap.players[g.id];
@@ -346,6 +350,11 @@ async function loadSeason(season, teams, label, p0, p1) {
       if (pp && !playerCache.games[g.id]) playerCache.games[g.id] = { [g.home.id]: pp.home, [g.away.id]: pp.away };
     }
     Object.assign(playerCache.names, snap.names);
+    // closing lines for finished games (ESPN removes odds after the final whistle)
+    for (const g of games) {
+      const o = snap.odds?.[g.id];
+      if (g.final && o && (!g.odds || g.odds.homeMl == null)) g.odds = { provider: 'Closing line', ...o };
+    }
   } catch { /* no snapshot for this season: download everything */ }
   const need = games.filter(g => g.final && (!playCache[g.id] || !playerCache.games[g.id]));
   await pool(need, 8, async g => {
@@ -1220,24 +1229,66 @@ function renderPosition(pos) {
 }
 
 // ===================== THIS WEEK CARD =====================
+// Most accurate winner pick = the Vegas favorite (66.8% right 2024-26 vs 63.9% for our model; blending didn't beat it).
+// Confidence comes from how strong a favorite Vegas makes them; our model only matters in the 60-70% band,
+// where favorites won 67% when it agreed and 59% when it disagreed (held in 2021-23 and 2024-26).
+const PICK_TIERS = [
+  { min: 0.80, tag: 'LOCK', cls: 'pick', hit: 0.87 },
+  { min: 0.70, tag: 'STRONG', cls: 'pick', hit: 0.75 },
+  { min: 0.60, tag: 'GOOD', cls: 'lean', hit: 0.64 },
+  { min: 0.55, tag: 'LEAN', cls: 'lean', hit: 0.60 },
+  { min: 0, tag: 'TOSS-UP', cls: 'skip', hit: 0.50 },
+];
+function pickCall(g, p) {
+  const vH = marketProb(g);
+  if (vH == null) { // no line posted yet: fall back to our model
+    const home = p.pHome >= 0.5;
+    return { team: home ? g.home.id : g.away.id, tag: 'MODEL', cls: 'skip', odds: null, hit: 0.64,
+      why: `${g.final ? 'No saved Vegas line for this game' : 'No Vegas line yet'}, so this is our model's pick (${pct(Math.max(p.pHome, 1 - p.pHome))}). Our model alone picks ~64% of winners.` };
+  }
+  const favHome = vH >= 0.5, vf = Math.max(vH, 1 - vH), team = favHome ? g.home.id : g.away.id;
+  const tier = PICK_TIERS.find(t => vf >= t.min);
+  const mFav = favHome ? p.pHome : 1 - p.pHome;
+  let hit = tier.hit;
+  if (tier.tag === 'GOOD') hit = mFav >= 0.6 ? 0.67 : mFav < 0.5 ? 0.59 : 0.64;
+  const other = S.teams[favHome ? g.away.id : g.home.id].abbr;
+  const model = mFav >= 0.6 ? `Our model agrees (${pct(mFav)}).` : mFav >= 0.5 ? `Our model slightly agrees (${pct(mFav)}).`
+    : `Our model disagrees: it likes ${other} (${pct(1 - mFav)}).`;
+  const why = tier.tag === 'TOSS-UP'
+    ? `Vegas has this nearly even (${pct(vf)}). Games like this are a coin flip. ${model}`
+    : `Vegas makes them ${pct(vf)} favorites. Picks like this won ~${Math.round(hit * 100)}% (2021–26). ${model}`;
+  return { team, tag: tier.tag, cls: tier.cls, odds: favHome ? g.odds.homeMl : g.odds.awayMl, hit, vf, why };
+}
+// points each team is expected to score, from the Vegas spread and total (more accurate than our projection)
+function vegasScore(g) {
+  const od = g.odds;
+  if (!od || od.total == null || od.homeSpread == null) return null;
+  return { h: od.total / 2 - od.homeSpread / 2, a: od.total / 2 + od.homeSpread / 2 };
+}
+
 function renderWeek() {
   const week = selectedWeek();
   const games = S.games.filter(g => g.week === week);
   const hfa = parseFloat($('hfaIn').value) || 0, qbPen = parseFloat($('qbIn').value) || 0, sd = parseFloat($('sdIn').value) || 13.5;
   const backup = backupSet(games);
   const wx = WX[week];
-  const counts = { PICK: 0, LEAN: 0, SKIP: 0 }; let props = 0, right = 0, done = 0;
+  const counts = {}; let props = 0, right = 0, done = 0;
   const cards = games.map(g => {
     const p = predict(P, g, hfa, sd, qbPen, backup);
     if (!p) return '';
     const H = S.teams[g.home.id], A = S.teams[g.away.id];
-    const c = gameCall(g, p); counts[c.label]++;
-    if (g.final && c.label !== 'SKIP') { done++; if ((g.home.score > g.away.score) === (c.team === g.home.id)) right++; }
-    const T = S.teams[c.team], d = new Date(g.date);
-    const mlKey = `${g.id}:ml:${c.team}`;
-    const rows = [`<div class="call"><span class="tag ${c.label.toLowerCase()}">${c.label}</span>
-      <div><b>${c.label === 'SKIP' ? 'No pick' : T.name + ' to win'}</b><div class="why">${c.why}</div></div>
-      ${c.label !== 'SKIP' && c.odds != null && !g.final ? trackBtn(mlKey, { kind: 'ml', gameId: g.id, week, teamId: c.team, odds: c.odds, label: `${T.abbr} moneyline (${A.abbr} @ ${H.abbr})` }) : ''}</div>`];
+    const c = gameCall(g, p); // moneyline betting advice (money, not accuracy)
+    const k = pickCall(g, p); counts[k.tag] = (counts[k.tag] || 0) + 1;
+    let resTag = '';
+    if (g.final && g.home.score !== g.away.score) {
+      const ok = (g.home.score > g.away.score) === (k.team === g.home.id); done++; if (ok) right++;
+      resTag = ok ? ' <span class="pos">✓</span>' : ' <span class="neg">✗</span>';
+    }
+    const T = S.teams[k.team], d = new Date(g.date);
+    const mlKey = `${g.id}:ml:${k.team}`;
+    const rows = [`<div class="call"><span class="tag ${k.cls}">${k.tag}</span>
+      <div><b>${T.name} to win</b>${resTag}<div class="why">${k.why}</div></div>
+      ${k.odds != null && !g.final ? trackBtn(mlKey, { kind: 'ml', gameId: g.id, week, teamId: k.team, odds: k.odds, label: `${T.abbr} moneyline (${A.abbr} @ ${H.abbr})` }) : ''}</div>`];
     if (c.bet) rows.push(`<div class="call"><span class="tag ${c.bet.ok ? 'pick' : 'skip'}">${c.bet.ok ? 'BET' : 'NO BET'}</span><div class="why">${c.bet.why}</div><span></span></div>`);
     rows.push(`<div class="call"><span class="tag skip">SKIP</span><div class="why">Spread & total: no reliable edge in testing.</div><span></span></div>`);
     for (const t of [g.away.id, g.home.id]) {
@@ -1253,19 +1304,22 @@ function renderWeek() {
       for (const x of best) rows.push(propCallRow(x));
     }
     const res = g.final ? ` · Final ${A.abbr} ${g.away.score}–${g.home.score} ${H.abbr}` : '';
-    return `<div class="card ${c.label === 'PICK' ? 'value' : ''}">
+    const vs = vegasScore(g);
+    return `<div class="card ${k.tag === 'LOCK' || k.tag === 'STRONG' ? 'value' : ''}">
       <div class="ghead"><span>${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${g.neutral ? ' · Neutral' : ''}${res}</span>
         <span>${g.odds?.homeSpread != null ? `Vegas: ${g.odds.homeSpread <= 0 ? H.abbr + ' ' + g.odds.homeSpread : A.abbr + ' ' + (-g.odds.homeSpread)}` : ''}</span></div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><img src="${A.logo}" width="24"> <b>${A.abbr} ${f1(p.aPts)}</b> <span class="muted">@</span> <b>${H.abbr} ${f1(p.hPts)}</b> <img src="${H.logo}" width="24"></div>
+      <div style="display:flex;align-items:center;gap:8px"><img src="${A.logo}" width="24"> <b>${A.abbr} ${f1(vs ? vs.a : p.aPts)}</b> <span class="muted">@</span> <b>${H.abbr} ${f1(vs ? vs.h : p.hPts)}</b> <img src="${H.logo}" width="24">
+        <span class="muted small">${vs ? 'best estimate' : 'our model'}</span></div>
+      <div class="muted small" style="margin:2px 0 6px">${vs ? `Our model: ${A.abbr} ${f1(p.aPts)} – ${H.abbr} ${f1(p.hPts)}` : 'No Vegas line yet'}</div>
       ${rows.join('')}
       ${injuryLine(g)}
     </div>`;
   });
   $('weekCards').innerHTML = cards.join('');
-  $('weekCardInfo').innerHTML = `Week ${week}: <b>${counts.PICK}</b> picks, <b>${counts.LEAN}</b> leans, <b>${counts.SKIP}</b> skips` +
+  const tierTxt = [...PICK_TIERS.map(t => t.tag), 'MODEL'].filter(t => counts[t]).map(t => `<b>${counts[t]}</b> ${t.toLowerCase()}`).join(' · ');
+  $('weekCardInfo').innerHTML = `Week ${week}: ${tierTxt}` +
     (wx?.ready ? ` · <b>${props}</b> props worth a look` : ' · loading injuries & DraftKings props…') +
-    (done ? ` · picks & leans went <b>${right}-${done - right}</b>` : '') +
-    (week <= 5 ? ' · <span class="dk">Weeks 2–5 are the model\'s least reliable stretch.</span>' : '');
+    (done ? ` · picks went <b>${right}-${done - right}</b>` : '');
 }
 
 function propCallRow(x) {

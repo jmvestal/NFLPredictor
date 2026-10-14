@@ -1,0 +1,16 @@
+{
+ "combined": {
+  "decay": 0.8,
+  "adj": 0,
+  "w": 0.2,
+  "tw": 0,
+  "sd": 12.5
+ },
+ "modelOnly": {
+  "decay": 1,
+  "adj": 1,
+  "w": 1,
+  "tw": 1,
+  "sd": 13
+ }
+}
