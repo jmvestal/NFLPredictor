@@ -1426,12 +1426,12 @@ const normName = n => String(n || '').toLowerCase().normalize('NFD').replace(/[�
 function mapMarket(m) {
   if (!m.playerProp) return null;
   const n = String(m.marketName || '').toLowerCase();
-  if (m.period && !/full|game|match|regular/i.test(m.period)) return null;
+  if (m.period && /half|quarter|\b[12]h\b|\bq[1-4]\b|\b[1-4]q\b|period|inning/i.test(m.period)) return null; // full game is "result"/"fulltime"
   if (/1st|2nd|first|second|half|quarter|longest|fantasy|first td|anytime|interception|sack|tackle|kick|field goal|punt/.test(n)) return null;
   if (/rush.*rec|rec.*rush|pass.*rush|rush.*pass/.test(n)) return null;
   if (/completion/.test(n)) return 'cmp';
   if (/pass(ing)? ?(yards|yds)/.test(n)) return 'passYds';
-  if (/pass(ing)? ?(touchdowns|tds|td)/.test(n)) return 'passTD';
+  if (/td passes|pass(ing)? ?(touchdowns|tds|td)\b/.test(n)) return 'passTD';
   if (/rush(ing)? ?(attempts|att)|carries/.test(n)) return 'rushAtt';
   if (/rush(ing)? ?(yards|yds)/.test(n)) return 'rushYds';
   if (/receiving ?(yards|yds)|rec ?yds/.test(n)) return 'recYds';
@@ -1440,7 +1440,7 @@ function mapMarket(m) {
 }
 async function novigSetup(force) {
   let meta = store.get(`${CACHE_V}:opMeta`);
-  if (meta?.v === 2 && !force) return meta;
+  if (meta?.v === 3 && !force) return meta;
   const sports = asList(await opGet('/sports'));
   const sp = sports.find(x => /american football/i.test(x.sportName || x.name || '')) || sports.find(x => /football/i.test(x.sportName || '') && !/soccer/i.test(x.sportName || ''));
   if (!sp) throw new Error("Couldn't find American football in OddsPapi's sports list.");
@@ -1460,7 +1460,7 @@ async function novigSetup(force) {
     if (Array.isArray(pj) || Array.isArray(pj?.data)) for (const x of asList(pj)) participants[x.participantId ?? x.id] = x.participantName ?? x.name;
     else if (pj && typeof pj === 'object') participants = pj;
   } catch { /* fixtures may carry names already */ }
-  meta = { v: 2, sportId: sp.sportId, tournamentId: nfl.tournamentId, markets, skipped, participants, at: Date.now() };
+  meta = { v: 3, sportId: sp.sportId, tournamentId: nfl.tournamentId, markets, skipped, participants, at: Date.now() };
   store.set(`${CACHE_V}:opMeta`, meta);
   return meta;
 }
@@ -1531,7 +1531,7 @@ function nvBadge(price, trueP) {
 }
 
 // ---------- settings ----------
-const APP_VERSION = '2026-10-14 · 16 (Novig line buttons)'; // bump with sw.js CACHE so the user can confirm an update arrived
+const APP_VERSION = '2026-10-14 · 17 (Novig market names fixed)'; // bump with sw.js CACHE so the user can confirm an update arrived
 function openSettings() {
   $('appVersion').textContent = APP_VERSION;
   $('opKeyIn').value = opKey() ? '••••••••' : '';

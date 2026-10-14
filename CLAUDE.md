@@ -139,7 +139,8 @@ Tuned on 2021-23, tested on 2024-26 (weeks 2+):
   - **Realistic % = market + trust × (model − market)**, where market = Novig's no-vig two-sided chance (or the single price). Anchoring at 50% was only right for DK lines assumed at −115; it inflated long shots.
   - The price checker uses the same anchor (Novig both sides → entered price → 50%).
 - Systems and ladder rungs show a "Novig x.xx" badge when Novig has that exact line. The price checker prefills Novig's price.
-- **Untested against a real OddsPapi response** (only a mock in the documented shape). On first real use, check the Settings status for matched games, unmatched names and empty markets, and adjust `mapMarket`/name matching.
+- Real OddsPapi data (2026-10-14 report): full-game markets have period "result"; names look like "Over Under Player Pass Yards (incl. overtime)", "… Rush Yards", "… Receiving Yards", "… Receptions", "… TD Passes", "… Pass Completions", "… Rush Attempts". `mapMarket` handles these (meta v3).
+- **Was untested against a real OddsPapi response** (only a mock in the documented shape). On first real use, check the Settings status for matched games, unmatched names and empty markets, and adjust `mapMarket`/name matching.
 
 ## Price checker (2026-10-14)
 
