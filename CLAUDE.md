@@ -97,6 +97,17 @@ Results (tuned 2021-23, tested 2024-25 + 2026):
 
 To refit: `node props.js tune` writes `props_params.json`. Then re-export to `props_app_params.json` (snippet in the session history) and replace the `const PROPS = …;` line in index.html.
 
+## GitHub: how the computers stay in sync
+
+- Repo: **https://github.com/jmvestal/NFLPredictor** (public). Hosted with GitHub Pages at **https://jmvestal.github.io/NFLPredictor/** (Settings → Pages → Deploy from branch `main`, folder `/`).
+- **Start of every session:** `git pull`. **End:** commit and `git push`. That replaces emailing handoff files.
+- Not in the repo (see `.gitignore`):
+  - Large backtest caches: rebuild with the fetch scripts.
+  - `.claude/launch.json`: per machine. Create it with `python -m http.server 8811` on Windows or `python3 -m http.server 8811` on Mac.
+- Windows work PC: Git Credential Manager handles login. The Mac uses a classic token (public_repo scope) in its keychain. Never paste tokens into chat.
+- After changing `index.html`, bump `CACHE` in `sw.js` (e.g. `nflp-shell-v2`) so installed phone apps pick up the new version.
+- Weekly: `cd backtest && node build_snapshot.js 2025,2026` refreshes `data/season-*.json` (needs the fetch caches). Then commit and push.
+
 ## Navigation and phone app (latest)
 
 - Header has two swipeable rows. **Week tabs** (Wk 2-18; the upcoming week is selected) set `curWeek` via `setWeek()`. **Section tabs**: Games | QB | RB | WR/TE | Props | Tracker | Model | Teams. The last-used tab is remembered.
