@@ -102,6 +102,10 @@ nav.sub button.active{color:var(--text);border-bottom-color:var(--accent);backgr
 nav.sub:empty{display:none}
 .soon{text-align:center;padding:60px 20px}
 .soon .big{font-size:56px}
+dialog#teamsHelp{width:min(640px,calc(100vw - 20px));max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;
+  background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:0 14px 14px}
+dialog#teamsHelp::backdrop{background:rgba(0,0,0,.6)}
+.dlghead{position:sticky;top:0;background:var(--panel);display:flex;justify-content:space-between;align-items:center;padding:12px 0 10px;z-index:1;border-bottom:1px solid var(--line);margin-bottom:10px}
 .legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:8px;margin-bottom:12px}
 .legend div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted)}
 .legend b{display:block;color:var(--text);font-size:13px}
@@ -210,16 +214,23 @@ nav.sub:empty{display:none}
   </section>
 
   <section id="tab-teams" class="hidden">
-    <div class="legend">
-      <div><b>Scores</b><span>Points this offense would score in a normal game against an <i>average</i> defense</span></div>
-      <div><b>Allows</b><span>Points this defense would give up against an <i>average</i> offense (lower is better)</span></div>
-      <div><b>Margin</b><span>Scores − Allows: how many points better than a typical opponent</span></div>
-      <div><b>Off / Def PPP</b><span>Points per play scored / allowed: the two numbers everything is built from</span></div>
+    <div class="bar">
+      <button class="btn sm" id="teamsHelpBtn" onclick="openTeamsHelp()">ⓘ How it works</button>
+      <button class="btn sm" id="totalsBtn" onclick="showTotals = !showTotals; renderTeams()">Show season totals</button>
+      <span class="muted small" id="teamsInfo"></span>
     </div>
-    <div class="card explain" id="teamExplain"></div>
-    <div class="bar" style="margin-top:14px"><span class="muted small" id="teamsInfo"></span><button class="btn sm" id="totalsBtn" onclick="showTotals = !showTotals; renderTeams()">Show season totals</button></div>
     <div class="tablewrap"><table id="teamsTbl"></table></div>
-    <div class="note" id="teamsNote">Tap a column name to sort, or tap a team to see its numbers worked out above.<br>
+    <dialog id="teamsHelp" aria-label="How the Teams numbers work">
+      <div class="dlghead"><b>How the Teams numbers work</b><button class="btn sm" onclick="$('teamsHelp').close()" aria-label="Close">✕</button></div>
+      <div class="legend">
+        <div><b>Scores</b><span>Points this offense would score in a normal game against an <i>average</i> defense</span></div>
+        <div><b>Allows</b><span>Points this defense would give up against an <i>average</i> offense (lower is better)</span></div>
+        <div><b>Margin</b><span>Scores − Allows: how many points better than a typical opponent</span></div>
+        <div><b>Off / Def PPP</b><span>Points per play scored / allowed: the two numbers everything is built from</span></div>
+      </div>
+      <div class="explain" id="teamExplain"></div>
+    </dialog>
+    <div class="note" id="teamsNote">Tap a column name to sort. Tap a team (or ⓘ How it works) to see how its numbers are calculated.<br>
       Off PPP = points scored ÷ own offensive plays. Def PPP = points allowed ÷ opponent offensive plays (lower is better). PPP and Plays/G blend this season with last season (see "Last-season games"); the season totals are this season only, so dividing Pts by Plays won't match Off PPP. Points include defensive/special-teams scores.</div>
   </section>
 
@@ -629,6 +640,14 @@ function renderGames() {
 let sortK = 'margin', sortDir = -1;
 let showTotals = false, exampleTeam = null;
 
+function openTeamsHelp() {
+  const d = $('teamsHelp');
+  if (!d.open) d.showModal();
+  d.scrollTop = 0;
+}
+// close when tapping the dark area outside the box
+document.addEventListener('click', e => { if (e.target.id === 'teamsHelp') e.target.close(); });
+
 // Step-by-step walkthrough of one team's numbers, using its real totals
 function renderTeamExample(r, byMargin, lgPlays) {
   if (!r) { $('teamExplain').innerHTML = ''; return; }
@@ -662,7 +681,7 @@ function renderTeamExample(r, byMargin, lgPlays) {
   } else weekStep = `<div class="step"><div class="n">6</div><div><div class="t">This week</div><div class="why">${T.abbr} doesn't play in Week ${selectedWeek()} (bye).</div></div></div>`;
 
   $('teamExplain').innerHTML = `
-    <h3><span>How the numbers work: <img src="${T.logo}" style="width:20px;vertical-align:middle"> ${T.name}</span>${select}</h3>
+    <h3><span>Example: <img src="${T.logo}" style="width:20px;vertical-align:middle"> ${T.name}</span>${select}</h3>
     <div class="why">Every number in the table comes from two simple rates: points per play on offense and on defense. Here is ${T.abbr}'s math, start to finish.</div>
     <div class="step"><div class="n">1</div><div><div class="t">Offense: points per play</div>
       <div class="why">${blendTxt(r.ptsFor, r.offPlays, 'ptsFor', 'offPlays', 'scored')}</div>
@@ -718,7 +737,7 @@ function renderTeams() {
     renderTeams();
   });
   $('teamsInfo').innerHTML = `Through week ${selectedWeek() - 1} · league average ${lg.toFixed(3)} points per play, ${f1(lgPlays)} plays per game`;
-  $('teamsTbl').querySelectorAll('tr[data-id]').forEach(tr => tr.onclick = () => { exampleTeam = tr.dataset.id; renderTeams(); $('teamExplain').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  $('teamsTbl').querySelectorAll('tr[data-id]').forEach(tr => tr.onclick = () => { exampleTeam = tr.dataset.id; renderTeams(); openTeamsHelp(); });
   // worked example: the chosen team, or the #1 team by Margin
   const byMargin = rows.slice().sort((a, b) => b.margin - a.margin);
   if (!rows.some(r => r.id === exampleTeam)) exampleTeam = byMargin[0]?.id;
