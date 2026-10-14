@@ -1,0 +1,20 @@
+# Large backtest caches - rebuild with the fetch scripts (see CLAUDE.md)
+backtest/games.csv
+backtest/boxscores.json
+backtest/players.json
+backtest/plays.json
+backtest/proplines.json
+backtest/props_params*.json
+backtest/props_app_params.json
+backtest/predictions_*.json
+backtest/results_*.json
+backtest/grid2024.json
+backtest/best_config.json
+
+# Machine-specific (python on Windows vs python3 on Mac); CLAUDE.md says how to recreate it
+.claude/
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini

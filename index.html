@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>NFL Predictor</title>
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NFL Picks">
+<style>
+:root{
+  --bg:#0b1220;--panel:#121b2e;--panel2:#18233a;--line:#24314d;--text:#e6ecf7;--muted:#8b99b5;
+  --accent:#3b82f6;--good:#22c55e;--bad:#ef4444;--warn:#f59e0b;--chip:#1e2a44;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+h1{font-size:18px;margin:0}
+h1 span{color:var(--accent)}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button,.btn{background:var(--chip);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit}
+nav button.active{background:var(--accent);border-color:var(--accent)}
+main{max-width:1150px;margin:0 auto;padding:18px 16px 60px}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px}
+.bar label{display:flex;gap:6px;align-items:center}
+select,input[type=number]{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;width:80px}
+select{width:auto}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.card.value{border-color:var(--good);box-shadow:0 0 0 1px var(--good) inset}
+.ghead{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
+.team{display:grid;grid-template-columns:28px 1fr 50px 50px 58px 64px;gap:6px;align-items:center;padding:4px 0}
+.team img{width:26px;height:26px}
+.team .nm{font-weight:600}
+.team .rec{color:var(--muted);font-weight:400;font-size:12px;margin-left:4px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.hdr{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.pbar{height:6px;border-radius:3px;background:var(--panel2);overflow:hidden;margin:6px 0 8px;display:flex}
+.pbar i{display:block;height:100%}
+.lines{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pill{background:var(--chip);border-radius:999px;padding:3px 9px;font-size:12px}
+.pill.g{background:rgba(34,197,94,.15);color:var(--good)}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+th{color:var(--muted);font-weight:500;font-size:12px;cursor:pointer;user-select:none}
+.tablewrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+#loading{padding:40px;text-align:center}
+.prog{height:8px;background:var(--panel2);border-radius:4px;max-width:420px;margin:12px auto;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);width:0}
+.hidden{display:none}
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;padding:10px 12px;margin-top:16px;font-size:12px;color:var(--muted)}
+.tag{display:inline-block;min-width:46px;text-align:center;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;letter-spacing:.4px}
+.tag.pick{background:var(--good);color:#06240f}
+.tag.lean{background:rgba(59,130,246,.25);color:#93c5fd}
+.tag.skip{background:var(--chip);color:var(--muted)}
+.tag.warn{background:rgba(245,158,11,.2);color:var(--warn)}
+.call{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.call:first-of-type{border-top:0}
+.why{font-size:12px;color:var(--muted)}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn.sm.done{background:transparent;color:var(--good);border-color:var(--good)}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stat b{display:block;font-size:22px}
+.dk{color:var(--accent)}
+.grid{grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))}
+header{position:sticky;top:0;z-index:10;padding-top:max(14px,env(safe-area-inset-top))}
+main{padding-bottom:max(60px,env(safe-area-inset-bottom))}
+@media (max-width:600px){
+  header{padding:10px 12px;gap:8px;padding-top:max(10px,env(safe-area-inset-top))}
+  h1{font-size:16px}
+  nav{flex-wrap:nowrap;overflow-x:auto;width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button,nav select{flex:0 0 auto}
+  main{padding:12px 10px 60px}
+  .card{padding:10px 11px}
+  th,td{padding:6px 6px;font-size:13px}
+  input[type=number]{font-size:16px} /* stops iOS zooming into inputs */
+  .call{gap:6px}
+  .btn.sm{padding:6px 9px} /* bigger tap targets */
+}
+header{flex-direction:column;align-items:stretch}
+header nav{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+header nav::-webkit-scrollbar{display:none}
+header nav button{flex:0 0 auto}
+.chips button{padding:5px 11px;border-radius:999px;font-size:13px}
+.chips button.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+.chips button.now{border-color:var(--accent)}
+.sectionhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:14px 0 8px}
+.sectionhead h3{margin:0}
+@media (max-width:420px){.team{grid-template-columns:24px 1fr 42px 42px 50px 56px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏈 NFL <span>Predictor</span></h1>
+  <nav id="weekTabs" class="chips" aria-label="Week"></nav>
+  <nav id="secTabs" aria-label="Section">
+    <button data-tab="week" class="active">Games</button>
+    <button data-tab="pos-QB">QB</button>
+    <button data-tab="pos-RB">RB</button>
+    <button data-tab="pos-WR">WR/TE</button>
+    <button data-tab="props">Props</button>
+    <button data-tab="tracker">Tracker</button>
+    <button data-tab="picks">Model</button>
+    <button data-tab="teams">Teams</button>
+  </nav>
+</header>
+<main>
+  <div id="loading">
+    <div id="loadmsg">Loading…</div>
+    <div class="prog"><i id="progbar"></i></div>
+  </div>
+
+  <section id="tab-week" class="hidden">
+    <div class="muted small" id="weekCardInfo" style="margin-bottom:10px"></div>
+    <div class="grid" id="weekCards"></div>
+    <div class="note">
+      <b>How the labels work</b> (from testing every game 2021–2025 plus this season):<br>
+      <span class="tag pick">PICK</span> the model and Vegas agree on the winner and the model is 60%+ sure: these won about 74% of the time.
+      <span class="tag lean">LEAN</span> they agree, but the model is 55–60%: about 62%.
+      <span class="tag skip">SKIP</span> toss-ups, games where the model picks the underdog (43%), and Thursday games (the model's weakest spot).<br>
+      <b>Moneyline bet</b> is only suggested for PICKs at 60–65% from Week 6 on, the one group that made money in testing (+2–4%). Bigger favorites win more often but cost too much to profit.
+      <b>Spreads and totals</b> never showed a reliable edge, so none are suggested.<br>
+      <b>Systems</b> and position-by-position props are in the <b>QB</b>, <b>RB</b> and <b>WR/TE</b> tabs.<br>
+      <b>Props</b> come from DraftKings lines. Against this season's real lines the model was too confident when it disagreed with DraftKings (its 80% picks hit ~67%),
+      so each prop shows a <b>realistic</b> chance and the <b>worst odds worth taking</b>. Only bet if your sportsbook's price is at or better than that.
+      Receiving and passing yards never beat the book, so they rarely qualify. Props are skipped when a teammate at a related position is Out/Doubtful
+      (the player's role may change, and DraftKings' line already knows it). 5 weeks of data: promising, not proven.
+    </div>
+  </section>
+
+  <section id="tab-pos" class="hidden">
+    <div class="muted small" id="posInfo" style="margin-bottom:6px"></div>
+    <div class="sectionhead"><h3>System</h3></div>
+    <div class="grid" id="posSystems"></div>
+    <div class="sectionhead"><h3>Best props</h3><button class="btn sm" id="posAllBtn">Show all props</button></div>
+    <div class="tablewrap"><table id="posProps"></table></div>
+    <div class="note">
+      <b>System</b>: the "easy" alternate prop for this position (QB 1+ TD, RB 30+ rushing yards, WR/TE 3+ catches), tested 2021–26. It wins small and loses big, so only bet at the listed price or better.<br>
+      <b>Best props</b>: DraftKings lines where the model's <b>realistic</b> chance beats a −115 price. Only bet at the "Bet at" odds or better.
+      QB passing yards and WR receiving yards rarely qualify; the model doesn't beat DraftKings on those.
+    </div>
+  </section>
+
+  <section id="tab-tracker" class="hidden">
+    <div class="bar">
+      <label class="small muted">Default bet $ <input type="number" id="stakeIn" step="1" min="1" value="10"></label>
+      <button class="btn sm" id="clearGraded">Remove graded picks</button>
+    </div>
+    <div class="stats" id="trackStats"></div>
+    <div class="tablewrap"><table id="trackTbl"></table></div>
+    <div class="note">Add picks with the <b>+ Track</b> buttons on This Week and Player Props. Picks grade themselves once the game is final (reload the page after games end).
+      Edit the odds to match what you actually got. A prop is voided if the player doesn't play. Saved in this browser only.</div>
+  </section>
+
+  <section id="tab-picks" class="hidden">
+    <div class="bar">
+      <label class="small muted" title="Games' worth of last season's numbers blended into each team's PPP">Last-season games <input type="number" id="prevIn" step="1" min="0" value="4"></label>
+      <label class="small muted" title="Points subtracted from a team marked as starting a backup QB">Backup QB (pts) <input type="number" id="qbIn" step="0.5" min="0" value="3"></label>
+      <label class="small muted">Home field (pts) <input type="number" id="hfaIn" step="0.5" value="0"></label>
+      <label class="small muted">Margin SD <input type="number" id="sdIn" step="0.5" value="13.5"></label>
+      <label class="small muted"><input type="checkbox" id="valueOnly"> Value only</label>
+    </div>
+    <div class="muted small" id="weekInfo" style="margin-bottom:10px"></div>
+    <div class="grid" id="games"></div>
+    <div class="note">
+      <b>How it works:</b> Team A's projected points = average of (A's Offensive PPP × A's offensive plays/game) and (B's Defensive PPP × A's offensive plays/game).
+      Each team's PPP and plays/game include 4 games' worth of last season's averages, which fade as this season's games pile up.
+      Tick "Backup QB" on a team starting someone other than its usual QB to take 3 points off its projection.
+      Win probability comes from the projected margin (normal distribution, Margin SD). Fair ML is the no-vig moneyline for that probability.
+      Edge = model win % − sportsbook no-vig win %; EV is per $100. A projection, not a guarantee — bet responsibly.
+    </div>
+  </section>
+
+  <section id="tab-teams" class="hidden">
+    <div class="bar"><span class="muted small" id="teamsInfo"></span></div>
+    <div class="tablewrap"><table id="teamsTbl"></table></div>
+    <div class="note" id="teamsNote">Off PPP = points scored ÷ own offensive plays. Def PPP = points allowed ÷ opponent offensive plays (lower is better). PPP and Plays/G blend this season with last season (see "Last-season games"); the GP, Pts and Plays columns are this season only. Points include defensive/special-teams scores.</div>
+  </section>
+
+  <section id="tab-props" class="hidden">
+    <div class="bar">
+      <select id="propGameSel"></select>
+      <select id="propStatSel">
+        <option value="">All stats</option>
+      </select>
+      <span class="muted small" id="propsInfo"></span>
+    </div>
+    <div class="tablewrap"><table id="propsTbl"></table></div>
+    <div class="note">
+      <b>How to use:</b> type the sportsbook's line (e.g. 64.5) in the Line box to see the model's chance of the Over and Under.
+      Optionally add the book's Over/Under odds (e.g. -115 / -105) to compare against the book's own estimate with its cut removed.<br>
+      <b>How it works:</b> Proj = the player's recent games (newer games count more, last season counts a little), pulled slightly toward typical values,
+      adjusted for how much of that stat the opponent allows. The Over/Under chances come from the real spread of outcomes in 2021–23 games,
+      and were checked on 2024–26 games: when it said 45%, it happened 45–47% of the time.<br>
+      <b>Good to know:</b> the Median is usually below the Proj (average) for yards — most games land under a player's average, and a few big games pull it up.
+      That's why an Over at a player's average line hits only ~42–44% for receivers and running backs.
+      For star players (top 10%), the Over chance runs ~3–5 points low on receiving yards, rushing yards and receptions — they beat their projection a bit more often than the model expects.
+      Props usually carry a bigger cut (−115 both ways ≈ 53.5% to break even). Whether these edges make money is untested — no free historical prop lines exist.
+    </div>
+  </section>
+</main>
+
+<script>
+const API = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
+const CACHE_V = 'nflp3';
+const store = {
+  get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+const getJSON = url => fetch(url).then(r => { if (!r.ok) throw new Error(r.status + ' ' + url); return r.json(); });
+const $ = id => document.getElementById(id);
+const pct = p => (p * 100).toFixed(1) + '%';
+const f1 = x => x.toFixed(1);
+const sgn = (x, d = 1) => (x > 0 ? '+' : '') + x.toFixed(d);
+
+// ---- math / odds ----
+function normCdf(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989423 * Math.exp(-z * z / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return z > 0 ? 1 - p : p;
+}
+const mlToProb = ml => ml < 0 ? -ml / (-ml + 100) : 100 / (ml + 100);
+const probToMl = p => p >= 0.5 ? -100 * p / (1 - p) : 100 * (1 - p) / p;
+const mlProfit = ml => ml > 0 ? ml : 100 * 100 / -ml;
+const fmtMl = ml => ml == null || !isFinite(ml) ? '—' : (ml > 0 ? '+' : '') + Math.round(ml);
+
+// ---- data ----
+function parseMl(side) {
+  const v = side?.close?.odds ?? side?.open?.odds;
+  if (v == null) return null;
+  if (/even/i.test(v)) return 100;
+  const n = parseFloat(v);
+  return isFinite(n) ? n : null;
+}
+
+function parseEvent(e, week, teams) {
+  const c = e.competitions[0];
+  const H = c.competitors.find(t => t.homeAway === 'home'), A = c.competitors.find(t => t.homeAway === 'away');
+  for (const t of [H, A]) teams[t.team.id] = { id: t.team.id, abbr: t.team.abbreviation, name: t.team.displayName, logo: t.team.logo };
+  const o = (c.odds || [])[0];
+  let odds = null;
+  if (o) {
+    let homeSpread = null;
+    const m = /^([A-Z]+)\s+(-?[\d.]+)/.exec(o.details || '');
+    if (m) homeSpread = m[1] === H.team.abbreviation ? parseFloat(m[2]) : -parseFloat(m[2]);
+    else if (/even|pk/i.test(o.details || '')) homeSpread = 0;
+    odds = {
+      provider: o.provider?.name, homeSpread, total: o.overUnder ?? null,
+      homeMl: parseMl(o.moneyline?.home) ?? o.homeTeamOdds?.moneyLine ?? null,
+      awayMl: parseMl(o.moneyline?.away) ?? o.awayTeamOdds?.moneyLine ?? null
+    };
+  }
+  const st = c.status.type;
+  const side = t => ({ id: t.team.id, score: +t.score || 0, record: t.records?.[0]?.summary || '', plays: null });
+  return { id: e.id, week, date: e.date, neutral: !!c.neutralSite, final: st.completed, state: st.state, statusText: st.shortDetail,
+           home: side(H), away: side(A), odds };
+}
+
+async function pool(items, n, fn, onDone) {
+  let i = 0, done = 0;
+  await Promise.all(Array.from({ length: n }, async () => {
+    while (i < items.length) { const it = items[i++]; await fn(it); onDone(++done, items.length); }
+  }));
+}
+
+function setProgress(msg, frac) { $('loadmsg').textContent = msg; $('progbar').style.width = (frac * 100) + '%'; }
+
+// All regular-season games for a season, with offensive play counts attached to finished games
+async function loadSeason(season, teams, label, p0, p1) {
+  const games = [];
+  const weeks = Array.from({ length: 18 }, (_, i) => i + 1);
+  await pool(weeks, 6, async w => {
+    const d = await getJSON(`${API}/scoreboard?dates=${season}&seasontype=2&week=${w}`);
+    for (const e of d.events) games.push(parseEvent(e, w, teams));
+  }, (d, n) => setProgress(`Loading ${label} schedule… ${d}/${n} weeks`, p0 + d / n * (p1 - p0) * 0.2));
+
+  // Offensive play counts and player stat lines from each finished game's box score (cached per game)
+  const playCache = store.get(`${CACHE_V}:plays:${season}`) || {};
+  const playerCache = store.get(`${CACHE_V}:players:${season}`) || { games: {}, names: {} };
+  // bundled snapshot (data/season-YYYY.json, built by backtest/build_snapshot.js) covers finished games, so
+  // only games played since the last update need full ESPN box score downloads (important on a phone)
+  try {
+    const snap = await getJSON(`data/season-${season}.json`);
+    for (const g of games) {
+      if (!g.final) continue;
+      const pl = snap.plays[g.id], pp = snap.players[g.id];
+      if (pl && !playCache[g.id]) playCache[g.id] = { [g.home.id]: pl.home, [g.away.id]: pl.away };
+      if (pp && !playerCache.games[g.id]) playerCache.games[g.id] = { [g.home.id]: pp.home, [g.away.id]: pp.away };
+    }
+    Object.assign(playerCache.names, snap.names);
+  } catch { /* no snapshot for this season: download everything */ }
+  const need = games.filter(g => g.final && (!playCache[g.id] || !playerCache.games[g.id]));
+  await pool(need, 8, async g => {
+    try {
+      const s = await getJSON(`${API}/summary?event=${g.id}`);
+      const rec = {};
+      for (const t of s.boxscore?.teams || []) {
+        const st = t.statistics.find(x => x.name === 'totalOffensivePlays');
+        if (st) rec[t.team.id] = +st.displayValue;
+      }
+      if (Object.keys(rec).length === 2) playCache[g.id] = rec;
+      const pl = extractPlayers(s, playerCache.names);
+      if (pl) playerCache.games[g.id] = pl;
+    } catch (err) { console.warn('summary failed', g.id, err); }
+  }, (d, n) => setProgress(`Loading ${label} box scores… ${d}/${n} games`, p0 + (p1 - p0) * (0.2 + d / n * 0.8)));
+  store.set(`${CACHE_V}:plays:${season}`, playCache);
+  store.set(`${CACHE_V}:players:${season}`, playerCache);
+  for (const g of games) {
+    const r = playCache[g.id];
+    if (r) { g.home.plays = r[g.home.id]; g.away.plays = r[g.away.id]; }
+    g.players = playerCache.games[g.id] || null; // { teamId: { playerId: statArray } }
+  }
+  games.names = playerCache.names;
+  return games;
+}
+
+// Per-player box score line, keyed by team id then player id:
+// [cmp, att, passYds, passTD, int, rushAtt, rushYds, rushTD, rec, recYds, recTD, tgt]
+function extractPlayers(s, names) {
+  const out = {};
+  const n = x => { const y = parseFloat(x); return isFinite(y) ? y : 0; };
+  for (const t of s.boxscore?.players || []) {
+    const team = out[t.team.id] = {};
+    for (const cat of t.statistics) {
+      if (!['passing', 'rushing', 'receiving'].includes(cat.name)) continue;
+      for (const a of cat.athletes || []) {
+        names[a.athlete.id] = a.athlete.displayName;
+        const r = team[a.athlete.id] ??= new Array(12).fill(0);
+        const v = Object.fromEntries(cat.keys.map((k, i) => [k, a.stats[i]]));
+        if (cat.name === 'passing') {
+          const [c, at] = (v['completions/passingAttempts'] || '0/0').split('/');
+          r[0] = n(c); r[1] = n(at); r[2] = n(v.passingYards); r[3] = n(v.passingTouchdowns); r[4] = n(v.interceptions);
+        } else if (cat.name === 'rushing') {
+          r[5] = n(v.rushingAttempts); r[6] = n(v.rushingYards); r[7] = n(v.rushingTouchdowns);
+        } else {
+          r[8] = n(v.receptions); r[9] = n(v.receivingYards); r[10] = n(v.receivingTouchdowns); r[11] = n(v.receivingTargets);
+        }
+      }
+    }
+  }
+  return Object.keys(out).length === 2 ? out : null;
+}
+
+// Last season's per-team totals (points, plays, games) plus player game logs — cached once the season is complete
+async function loadPrev(season, teams) {
+  const key = `${CACHE_V}:prev:${season}`;
+  const cached = store.get(key);
+  if (cached) return cached;
+  const games = await loadSeason(season, teams, `${season} season`, 0, 0.6);
+  const prev = {
+    totals: accumulate(games, Infinity).teams,
+    names: games.names,
+    games: games.filter(g => g.players).map(g => ({ week: g.week, home: g.home.id, away: g.away.id, players: g.players }))
+  };
+  if (games.length && games.every(g => g.final)) {
+    store.set(key, prev);
+    // the per-season caches are folded into `prev`, so drop them to save space
+    try { localStorage.removeItem(`${CACHE_V}:players:${season}`); localStorage.removeItem(`${CACHE_V}:plays:${season}`); } catch {}
+  }
+  return prev;
+}
+
+async function loadAll() {
+  const sb = await getJSON(API + '/scoreboard');
+  const season = sb.season.year;
+  const curWeek = sb.season.type === 2 ? sb.week.number : 18;
+  const teams = {};
+  const prev = await loadPrev(season - 1, teams);
+  const prevTotals = prev.totals;
+  const games = await loadSeason(season, teams, `${season}`, 0.6, 1);
+  const names = { ...prev.names, ...games.names };
+  games.sort((a, b) => a.week - b.week || a.date.localeCompare(b.date));
+  // "This coming week" = first week where no game has kicked off yet
+  const started = new Set(games.filter(g => g.state !== 'pre').map(g => g.week));
+  const upcoming = games.find(g => !started.has(g.week));
+  const nextWeek = upcoming ? upcoming.week : curWeek;
+  return { games, teams, season, curWeek, nextWeek, prevTotals, prevGames: prev.games, names };
+}
+
+// Season totals per team from finished games before `beforeWeek`
+function accumulate(games, beforeWeek) {
+  const t = {};
+  const get = id => t[id] ??= { id, gp: 0, ptsFor: 0, ptsAg: 0, offPlays: 0, defPlays: 0, w: 0, l: 0, tie: 0 };
+  let n = 0;
+  for (const g of games) {
+    if (!g.final || g.week >= beforeWeek || !g.home.plays || !g.away.plays) continue;
+    n++;
+    for (const [me, op] of [[g.home, g.away], [g.away, g.home]]) {
+      const r = get(me.id);
+      r.gp++; r.ptsFor += me.score; r.ptsAg += op.score; r.offPlays += me.plays; r.defPlays += op.plays;
+      if (me.score > op.score) r.w++; else if (me.score < op.score) r.l++; else r.tie++;
+    }
+  }
+  return { teams: t, nGames: n };
+}
+
+// ---- PPP: this season's totals + `prevN` games' worth of last season's per-game averages ----
+// (backtested 2021-25: blending 4 games of last season was the most reliable improvement)
+function computePPP(games, beforeWeek, prevTotals, prevN) {
+  const { teams: cur, nGames } = accumulate(games, beforeWeek);
+  const t = {};
+  for (const id of new Set([...Object.keys(cur), ...Object.keys(prevTotals || {})])) {
+    const c = cur[id] || { id, gp: 0, ptsFor: 0, ptsAg: 0, offPlays: 0, defPlays: 0, w: 0, l: 0, tie: 0 };
+    const p = prevTotals?.[id], G = p && p.gp ? prevN : 0;
+    const add = k => c[k] + (G ? G * p[k] / p.gp : 0);
+    const gpAll = c.gp + G;
+    if (!gpAll) continue;
+    t[id] = { ...c, prevGames: G,
+      offPPP: add('ptsFor') / add('offPlays'), defPPP: add('ptsAg') / add('defPlays'), playsPG: add('offPlays') / gpAll };
+  }
+  let pts = 0, plays = 0;
+  for (const r of Object.values(cur)) { pts += r.ptsFor; plays += r.offPlays; }
+  return { teams: t, nGames, leaguePPP: plays ? pts / plays : 0 };
+}
+
+// Each team's points = avg of (own Off PPP × own plays/g) and (opp Def PPP × own plays/g),
+// + home-field points for the home team, − penalty for a team starting a backup QB
+function predict(P, g, hfa, sd, qbPen, backup) {
+  const H = P.teams[g.home.id], A = P.teams[g.away.id];
+  if (!H || !A) return null;
+  const hOff = H.offPPP * H.playsPG, hVsDef = A.defPPP * H.playsPG;
+  const aOff = A.offPPP * A.playsPG, aVsDef = H.defPPP * A.playsPG;
+  const hAdj = (g.neutral ? 0 : hfa) - (backup.has(g.id + ':' + g.home.id) ? qbPen : 0);
+  const aAdj = -(backup.has(g.id + ':' + g.away.id) ? qbPen : 0);
+  const hPts = (hOff + hVsDef) / 2 + hAdj, aPts = (aOff + aVsDef) / 2 + aAdj;
+  const margin = hPts - aPts;
+  return { hOff, hVsDef, aOff, aVsDef, hAdj, aAdj, hPts, aPts, margin, total: hPts + aPts, pHome: normCdf(margin / sd) };
+}
+
+// ---- UI ----
+let S = null, P = null;
+let curTab = 'week', curWeek = null, posShowAll = false;
+document.querySelectorAll('#secTabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showTab(t) {
+  curTab = t;
+  try { localStorage.setItem(`${CACHE_V}:tab`, t); } catch {}
+  document.querySelectorAll('#secTabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  const sec = t.startsWith('pos-') ? 'pos' : t;
+  for (const s of ['week', 'pos', 'picks', 'teams', 'props', 'tracker']) $('tab-' + s).classList.toggle('hidden', s !== sec);
+  if (t === 'tracker') renderTracker();
+  if (sec === 'pos') renderPosition(t.slice(4));
+  window.scrollTo(0, 0);
+}
+
+function selectedWeek() { return curWeek; }
+function setWeek(w) {
+  curWeek = w;
+  document.querySelectorAll('#weekTabs button').forEach(b => b.classList.toggle('active', +b.dataset.week === w));
+  document.querySelector(`#weekTabs button[data-week="${w}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  renderAll();
+  loadWeekExtras(w).then(renderAll);
+}
+
+function breakdown(t, opp, off, vsDef, adj, pts) {
+  const r = P.teams[t.id], o = P.teams[opp.id];
+  const extra = adj ? ` ${adj > 0 ? '+' : '−'} ${f1(Math.abs(adj))}` : '';
+  return `${t.abbr}: (${r.offPPP.toFixed(3)} × ${f1(r.playsPG)} = ${f1(off)}) + (${opp.abbr} Def ${o.defPPP.toFixed(3)} × ${f1(r.playsPG)} = ${f1(vsDef)}) ÷ 2${extra} = <b>${f1(pts)}</b>`;
+}
+
+// Backup QB per "gameId:teamId": the user's checkbox wins; otherwise automatic from the injury report
+// (team's primary QB listed Out / Doubtful / IR).
+const qbManual = store.get(`${CACHE_V}:qbManual`) || {};
+function toggleBackup(key, on) {
+  qbManual[key] = on;
+  store.set(`${CACHE_V}:qbManual`, qbManual);
+  renderAll();
+}
+function autoBackup(g, teamId) {
+  const qb = primaryQB(teamId, g.week);
+  if (!qb) return null;
+  const st = injuryStatus(g, teamId, qb);
+  return st && OUT_RE.test(st) ? { qb, status: st } : null;
+}
+function backupSet(games) {
+  const s = new Set();
+  for (const g of games) for (const t of [g.home.id, g.away.id]) {
+    const key = g.id + ':' + t;
+    if (key in qbManual ? qbManual[key] : !!autoBackup(g, t)) s.add(key);
+  }
+  return s;
+}
+
+function renderGames() {
+  const week = selectedWeek();
+  const prevN = Math.max(0, parseFloat($('prevIn').value) || 0);
+  P = computePPP(S.games, week, S.prevTotals, prevN);
+  const hfa = parseFloat($('hfaIn').value) || 0;
+  const qbPen = parseFloat($('qbIn').value) || 0;
+  const sd = parseFloat($('sdIn').value) || 13.5;
+  const MIN_EDGE = 0.03;
+  const valueOnly = $('valueOnly').checked;
+  $('weekInfo').textContent = `Week ${week}: using ${P.nGames} completed games from weeks 1–${week - 1}` +
+    (prevN ? ` + ${prevN} games' worth of ${S.season - 1} averages` : '') + ` · league avg ${P.leaguePPP.toFixed(3)} PPP`;
+  const html = [];
+  let right = 0, decided = 0;
+  const backupQB = backupSet(S.games.filter(x => x.week === week));
+  for (const g of S.games.filter(x => x.week === week)) {
+    const p = predict(P, g, hfa, sd, qbPen, backupQB);
+    if (!p) continue;
+    const H = S.teams[g.home.id], A = S.teams[g.away.id], od = g.odds;
+    let mk = null;
+    if (od && od.homeMl != null && od.awayMl != null) {
+      const ih = mlToProb(od.homeMl), ia = mlToProb(od.awayMl);
+      mk = { pH: ih / (ih + ia), pA: ia / (ih + ia) };
+      mk.edgeH = p.pHome - mk.pH; mk.edgeA = (1 - p.pHome) - mk.pA;
+      mk.evH = p.pHome * mlProfit(od.homeMl) - (1 - p.pHome) * 100;
+      mk.evA = (1 - p.pHome) * mlProfit(od.awayMl) - p.pHome * 100;
+    }
+    const valH = mk && mk.edgeH >= MIN_EDGE && mk.evH > 0, valA = mk && mk.edgeA >= MIN_EDGE && mk.evA > 0;
+    if (valueOnly && !valH && !valA) continue;
+    if (g.final) { decided++; if ((p.margin > 0) === (g.home.score > g.away.score)) right++; }
+    const row = (t, side, pts, prob, ml, edge, isVal) => `
+      <div class="team">
+        <img src="${t.logo}" alt="">
+        <div class="nm">${t.abbr}<span class="rec">${side.record}</span></div>
+        <div class="num">${g.state !== 'pre' ? `<b>${side.score}</b> ` : ''}<span class="${g.state !== 'pre' ? 'muted' : ''}">${f1(pts)}</span></div>
+        <div class="num">${(prob * 100).toFixed(0)}%</div>
+        <div class="num">${fmtMl(probToMl(prob))}</div>
+        <div class="num">${fmtMl(ml)}${edge != null ? `<div class="small ${isVal ? 'pos' : edge < 0 ? 'neg' : 'muted'}">${sgn(edge * 100)}%</div>` : ''}</div>
+      </div>`;
+    const fav = p.margin >= 0 ? H : A;
+    const lines = [`<span class="pill">Model: ${fav.abbr} -${f1(Math.abs(p.margin))}</span>`, `<span class="pill">Total ${f1(p.total)}</span>`];
+    if (od?.homeSpread != null) {
+      const coverH = normCdf((p.margin + od.homeSpread) / sd);
+      const pickH = coverH >= 0.5, cp = pickH ? coverH : 1 - coverH, line = pickH ? od.homeSpread : -od.homeSpread;
+      lines.push(`<span class="pill ${cp >= 0.55 ? 'g' : ''}">ATS: ${(pickH ? H : A).abbr} ${line > 0 ? '+' : ''}${line} (${pct(cp)})</span>`);
+    }
+    if (od?.total != null) {
+      const diff = p.total - od.total;
+      lines.push(`<span class="pill ${Math.abs(diff) >= 3 ? 'g' : ''}">${diff >= 0 ? 'Over' : 'Under'} ${od.total} (${sgn(diff)})</span>`);
+    }
+    if (valH) lines.push(`<span class="pill g">Value: ${H.abbr} ML · EV ${sgn(mk.evH, 0)}/$100</span>`);
+    if (valA) lines.push(`<span class="pill g">Value: ${A.abbr} ML · EV ${sgn(mk.evA, 0)}/$100</span>`);
+    const d = new Date(g.date);
+    html.push(`<div class="card ${valH || valA ? 'value' : ''}">
+      <div class="ghead"><span>${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${g.neutral ? ' · Neutral' : ''}</span><span>${g.state === 'pre' ? (od?.provider || '') : g.statusText}</span></div>
+      <div class="team hdr"><span></span><span>Team</span><span class="num">Proj</span><span class="num">Win</span><span class="num">Fair ML</span><span class="num">Book</span></div>
+      ${row(A, g.away, p.aPts, 1 - p.pHome, od?.awayMl, mk?.edgeA, valA)}
+      ${row(H, g.home, p.hPts, p.pHome, od?.homeMl, mk?.edgeH, valH)}
+      <div class="pbar"><i style="width:${(1 - p.pHome) * 100}%;background:#64748b"></i><i style="width:${p.pHome * 100}%;background:var(--accent)"></i></div>
+      <div class="small muted">${breakdown(A, H, p.aOff, p.aVsDef, p.aAdj, p.aPts)}<br>${breakdown(H, A, p.hOff, p.hVsDef, p.hAdj, p.hPts)}</div>
+      <div class="lines">${lines.join('')}</div>
+      <div class="lines small muted">Backup QB:
+        ${[A, H].map(t => { const k = g.id + ':' + t.id, auto = autoBackup(g, t.id);
+          return `<label title="${auto ? 'Auto: ' + (S.names[auto.qb] || 'starter') + ' ' + auto.status : ''}"><input type="checkbox" ${backupQB.has(k) ? 'checked' : ''} onchange="toggleBackup('${k}', this.checked)"> ${t.abbr}${auto ? ' <span class="dk">(auto)</span>' : ''}</label>`; }).join(' ')}
+      </div>
+      ${injuryLine(g)}
+    </div>`);
+  }
+  $('games').innerHTML = html.join('') || '<div class="muted">No games match.</div>';
+  if (decided) $('weekInfo').textContent += ` · Straight-up ${right}/${decided}`;
+  renderTeams();
+}
+
+let sortK = 'offPPP', sortDir = -1;
+function renderTeams() {
+  const rows = Object.values(P.teams).map(r => ({ ...r, t: S.teams[r.id], net: r.offPPP - r.defPPP }));
+  rows.sort((a, b) => (sortK === 'name' ? a.t.abbr.localeCompare(b.t.abbr) : a[sortK] - b[sortK]) * sortDir);
+  const cols = [['rank', '#'], ['name', 'Team'], ['gp', 'GP'], ['offPPP', 'Off PPP'], ['defPPP', 'Def PPP'], ['net', 'Net PPP'], ['playsPG', 'Plays/G'], ['ptsFor', 'Pts'], ['offPlays', 'Off Plays'], ['ptsAg', 'Pts Allowed'], ['defPlays', 'Def Plays']];
+  const lg = P.leaguePPP;
+  $('teamsTbl').innerHTML = `<tr>${cols.map(([k, l]) => `<th data-k="${k}">${l}${k === sortK ? (sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('')}</tr>` +
+    rows.map((r, i) => `<tr><td>${i + 1}</td><td><img src="${r.t.logo}" style="width:18px;vertical-align:middle;margin-right:6px">${r.t.name} <span class="muted small">${r.w}-${r.l}${r.tie ? '-' + r.tie : ''}</span></td>
+      <td>${r.gp}</td><td class="${r.offPPP >= lg ? 'pos' : 'neg'}">${r.offPPP.toFixed(3)}</td><td class="${r.defPPP <= lg ? 'pos' : 'neg'}">${r.defPPP.toFixed(3)}</td>
+      <td class="${r.net >= 0 ? 'pos' : 'neg'}">${sgn(r.net, 3)}</td><td>${f1(r.playsPG)}</td><td>${r.ptsFor}</td><td>${r.offPlays}</td><td>${r.ptsAg}</td><td>${r.defPlays}</td></tr>`).join('');
+  $('teamsTbl').querySelectorAll('th').forEach(th => th.onclick = () => {
+    const k = th.dataset.k; if (k === 'rank') return;
+    sortDir = sortK === k ? -sortDir : (k === 'defPPP' || k === 'ptsAg' || k === 'name' ? 1 : -1); sortK = k;
+    renderTeams();
+  });
+  $('teamsInfo').textContent = `Through week ${selectedWeek() - 1} · league average ${lg.toFixed(3)} PPP`;
+}
+
+// ===================== PLAYER PROPS =====================
+// Fitted in backtest/props.js on 2021-23, checked on 2024-26 (see CLAUDE.md). `emp` = quantiles of actual÷projected,
+// in 5 bins by projection size — the empirical distribution used for Over/Under chances.
+const PROPS = {"prior":{"rec":2.718,"recYds":29.719,"rushAtt":10.568,"rushAtt:qb":3.791,"rushYds":45.368,"rushYds:qb":17.028,"cmp":20.802,"passYds":227.571,"passTD":1.377},"stats":{"rec":{"label":"Receptions","idx":8,"role":"rec","minMu":2,"kind":"count","priorMode":"league","gamma":0,"decay":1,"lastSeason":0.25,"shrink":6,"alpha":0,"beta":0,"emp":[{"maxMu":2.26,"q":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.443,0.443,0.444,0.445,0.446,0.447,0.447,0.448,0.449,0.449,0.45,0.45,0.451,0.451,0.452,0.453,0.453,0.454,0.454,0.455,0.456,0.457,0.458,0.459,0.459,0.46,0.461,0.461,0.462,0.462,0.463,0.464,0.465,0.465,0.466,0.466,0.467,0.468,0.468,0.469,0.469,0.47,0.471,0.471,0.472,0.473,0.474,0.474,0.475,0.476,0.477,0.477,0.478,0.479,0.48,0.481,0.481,0.482,0.483,0.484,0.485,0.486,0.487,0.487,0.488,0.49,0.491,0.492,0.492,0.492,0.493,0.493,0.494,0.494,0.495,0.496,0.498,0.499,0.499,0.499,0.499,0.886,0.888,0.889,0.892,0.893,0.895,0.898,0.9,0.902,0.905,0.906,0.911,0.913,0.916,0.919,0.921,0.923,0.928,0.931,0.933,0.935,0.937,0.939,0.941,0.944,0.947,0.948,0.951,0.955,0.959,0.962,0.964,0.966,0.968,0.971,0.974,0.978,0.983,0.985,0.986,0.987,0.989,0.997,0.998,0.999,1.331,1.339,1.345,1.347,1.354,1.361,1.368,1.376,1.383,1.393,1.398,1.401,1.408,1.414,1.423,1.433,1.444,1.45,1.46,1.477,1.484,1.497,1.784,1.793,1.807,1.825,1.848,1.865,1.879,1.898,1.917,1.928,1.969,1.983,2.23,2.269,2.3,2.362,2.473,2.69,2.808,3.237,4.223]},{"maxMu":2.55,"q":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.393,0.394,0.394,0.395,0.396,0.397,0.399,0.399,0.4,0.401,0.401,0.402,0.402,0.403,0.404,0.405,0.406,0.407,0.408,0.409,0.409,0.41,0.41,0.411,0.412,0.413,0.414,0.415,0.416,0.417,0.417,0.418,0.419,0.42,0.421,0.422,0.422,0.422,0.423,0.424,0.424,0.425,0.426,0.426,0.427,0.429,0.429,0.429,0.429,0.431,0.431,0.432,0.433,0.434,0.434,0.435,0.435,0.436,0.436,0.437,0.438,0.439,0.44,0.441,0.441,0.442,0.443,0.786,0.789,0.79,0.793,0.795,0.798,0.799,0.802,0.804,0.806,0.807,0.808,0.81,0.811,0.812,0.814,0.815,0.817,0.82,0.821,0.824,0.826,0.829,0.831,0.834,0.836,0.838,0.84,0.842,0.845,0.845,0.848,0.85,0.853,0.856,0.858,0.858,0.861,0.864,0.868,0.87,0.872,0.874,0.876,0.88,0.881,0.883,0.885,1.177,1.183,1.186,1.192,1.198,1.202,1.206,1.211,1.218,1.221,1.228,1.232,1.235,1.238,1.247,1.254,1.263,1.267,1.275,1.278,1.287,1.29,1.297,1.301,1.303,1.309,1.315,1.32,1.325,1.572,1.584,1.597,1.611,1.624,1.638,1.648,1.662,1.675,1.693,1.702,1.716,1.726,1.749,1.764,1.77,1.987,2.012,2.047,2.07,2.103,2.136,2.154,2.354,2.386,2.457,2.54,2.579,2.82,3.04,3.955]},{"maxMu":2.99,"q":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.335,0.337,0.339,0.34,0.342,0.344,0.345,0.346,0.347,0.349,0.351,0.352,0.353,0.355,0.357,0.358,0.359,0.361,0.362,0.363,0.365,0.366,0.368,0.368,0.37,0.37,0.371,0.373,0.375,0.375,0.377,0.378,0.379,0.38,0.381,0.382,0.383,0.384,0.385,0.386,0.387,0.388,0.389,0.39,0.391,0.392,0.673,0.676,0.68,0.683,0.685,0.687,0.691,0.696,0.7,0.705,0.708,0.71,0.714,0.716,0.718,0.723,0.726,0.727,0.73,0.732,0.734,0.736,0.739,0.741,0.744,0.746,0.749,0.751,0.754,0.756,0.758,0.76,0.762,0.765,0.767,0.77,0.772,0.775,0.777,0.78,0.783,1.006,1.011,1.013,1.017,1.019,1.025,1.032,1.035,1.039,1.042,1.048,1.053,1.058,1.061,1.066,1.07,1.074,1.076,1.081,1.087,1.091,1.095,1.1,1.106,1.108,1.112,1.116,1.119,1.121,1.128,1.132,1.137,1.14,1.147,1.152,1.158,1.16,1.163,1.167,1.171,1.176,1.343,1.354,1.358,1.362,1.37,1.378,1.391,1.397,1.403,1.414,1.423,1.436,1.448,1.459,1.468,1.481,1.49,1.506,1.512,1.52,1.53,1.538,1.553,1.566,1.678,1.697,1.725,1.745,1.759,1.775,1.79,1.807,1.821,1.841,1.851,1.88,1.905,1.928,1.944,2.021,2.053,2.091,2.122,2.171,2.2,2.236,2.29,2.325,2.369,2.502,2.618,2.69,2.813,3.145,3.383,3.707]},{"maxMu":3.74,"q":[0,0,0,0,0,0,0,0,0,0.269,0.274,0.279,0.285,0.288,0.29,0.295,0.297,0.301,0.303,0.304,0.307,0.31,0.311,0.314,0.316,0.318,0.319,0.32,0.323,0.324,0.325,0.328,0.329,0.331,0.333,0.535,0.54,0.544,0.548,0.555,0.559,0.565,0.568,0.578,0.583,0.588,0.593,0.596,0.598,0.6,0.604,0.608,0.612,0.615,0.62,0.624,0.628,0.63,0.635,0.636,0.637,0.639,0.643,0.647,0.651,0.653,0.657,0.66,0.662,0.666,0.802,0.807,0.813,0.823,0.826,0.838,0.848,0.855,0.861,0.869,0.879,0.885,0.891,0.895,0.899,0.904,0.907,0.912,0.916,0.922,0.925,0.932,0.937,0.942,0.947,0.952,0.957,0.96,0.965,0.97,0.977,0.982,0.988,0.991,0.994,0.999,1.004,1.073,1.081,1.091,1.102,1.112,1.123,1.136,1.142,1.151,1.161,1.175,1.184,1.198,1.204,1.211,1.221,1.228,1.235,1.242,1.25,1.258,1.266,1.27,1.28,1.288,1.296,1.308,1.317,1.324,1.332,1.34,1.354,1.367,1.379,1.392,1.406,1.422,1.444,1.456,1.465,1.476,1.487,1.498,1.517,1.525,1.537,1.545,1.558,1.572,1.584,1.604,1.614,1.62,1.625,1.631,1.641,1.649,1.66,1.672,1.7,1.721,1.738,1.771,1.801,1.815,1.838,1.865,1.881,1.894,1.904,1.923,1.935,1.957,1.979,1.986,2.005,2.029,2.087,2.116,2.144,2.174,2.198,2.226,2.249,2.271,2.301,2.338,2.409,2.481,2.557,2.677,2.823,3.02,3.484]},{"maxMu":1000000000,"q":[0,0,0.172,0.209,0.22,0.224,0.232,0.238,0.242,0.249,0.256,0.261,0.266,0.358,0.391,0.407,0.424,0.437,0.45,0.456,0.462,0.469,0.474,0.482,0.489,0.493,0.498,0.503,0.506,0.51,0.514,0.518,0.525,0.531,0.534,0.593,0.627,0.631,0.643,0.656,0.663,0.674,0.682,0.687,0.692,0.697,0.703,0.708,0.716,0.72,0.724,0.729,0.736,0.739,0.746,0.749,0.753,0.756,0.764,0.771,0.778,0.786,0.792,0.795,0.804,0.836,0.846,0.851,0.862,0.872,0.88,0.892,0.901,0.911,0.915,0.923,0.932,0.937,0.943,0.949,0.958,0.96,0.965,0.97,0.98,0.985,0.993,0.999,1.003,1.01,1.016,1.018,1.021,1.025,1.033,1.039,1.047,1.051,1.055,1.059,1.065,1.068,1.081,1.094,1.102,1.11,1.12,1.13,1.141,1.154,1.163,1.17,1.177,1.187,1.193,1.201,1.207,1.214,1.222,1.231,1.242,1.249,1.257,1.264,1.268,1.275,1.282,1.287,1.295,1.301,1.308,1.316,1.322,1.33,1.336,1.348,1.358,1.374,1.386,1.398,1.411,1.42,1.428,1.442,1.451,1.459,1.467,1.474,1.48,1.491,1.504,1.511,1.519,1.523,1.531,1.539,1.548,1.56,1.575,1.583,1.597,1.613,1.629,1.654,1.669,1.686,1.7,1.715,1.731,1.746,1.768,1.788,1.799,1.815,1.823,1.847,1.859,1.868,1.885,1.91,1.928,1.959,1.971,1.988,2.021,2.054,2.084,2.103,2.125,2.152,2.185,2.206,2.238,2.275,2.32,2.379,2.527,2.626,2.682,2.923,4.006]}]},"recYds":{"label":"Receiving yards","idx":9,"role":"rec","minMu":20,"kind":"yards","priorMode":"league","gamma":0,"decay":0.9,"lastSeason":0.5,"shrink":6,"alpha":0.5,"beta":0,"emp":[{"maxMu":23.36,"q":[-0.45,-0.192,-0.136,-0.088,-0.045,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.043,0.045,0.047,0.048,0.05,0.087,0.09,0.094,0.097,0.13,0.131,0.135,0.137,0.14,0.146,0.172,0.174,0.178,0.183,0.187,0.189,0.193,0.197,0.215,0.22,0.226,0.231,0.235,0.239,0.245,0.258,0.262,0.267,0.27,0.274,0.279,0.283,0.288,0.292,0.3,0.307,0.321,0.326,0.336,0.343,0.347,0.351,0.359,0.367,0.373,0.386,0.389,0.394,0.397,0.405,0.413,0.42,0.43,0.435,0.439,0.447,0.454,0.471,0.479,0.486,0.492,0.505,0.516,0.521,0.525,0.534,0.541,0.548,0.557,0.567,0.575,0.585,0.593,0.602,0.612,0.622,0.64,0.645,0.654,0.667,0.674,0.686,0.692,0.697,0.711,0.718,0.729,0.736,0.745,0.757,0.774,0.784,0.793,0.81,0.818,0.826,0.837,0.85,0.867,0.884,0.899,0.918,0.938,0.959,0.972,0.989,0.998,1.018,1.033,1.044,1.062,1.081,1.092,1.104,1.12,1.146,1.164,1.183,1.2,1.213,1.226,1.245,1.261,1.287,1.304,1.327,1.349,1.36,1.401,1.421,1.452,1.493,1.516,1.553,1.581,1.601,1.631,1.671,1.703,1.755,1.811,1.868,1.918,1.96,2.013,2.074,2.15,2.248,2.387,2.459,2.515,2.595,2.75,2.837,3.002,3.198,3.439,3.781,5.356]},{"maxMu":26.62,"q":[-0.265,-0.085,-0.078,-0.039,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.04,0.041,0.076,0.078,0.08,0.084,0.084,0.115,0.118,0.121,0.123,0.127,0.156,0.159,0.165,0.168,0.188,0.192,0.195,0.199,0.201,0.203,0.206,0.21,0.213,0.23,0.235,0.239,0.242,0.247,0.252,0.257,0.266,0.276,0.284,0.291,0.296,0.299,0.305,0.312,0.317,0.323,0.33,0.334,0.34,0.347,0.358,0.367,0.373,0.379,0.383,0.39,0.401,0.414,0.417,0.423,0.427,0.436,0.448,0.455,0.462,0.47,0.475,0.481,0.489,0.497,0.504,0.508,0.517,0.529,0.535,0.544,0.549,0.556,0.567,0.578,0.588,0.599,0.608,0.621,0.627,0.637,0.642,0.648,0.66,0.666,0.676,0.686,0.691,0.704,0.714,0.719,0.727,0.741,0.752,0.761,0.773,0.784,0.796,0.807,0.818,0.832,0.841,0.856,0.871,0.885,0.892,0.905,0.916,0.924,0.938,0.959,0.975,0.986,1.006,1.022,1.04,1.062,1.083,1.098,1.115,1.13,1.141,1.153,1.173,1.196,1.224,1.25,1.271,1.299,1.314,1.343,1.366,1.389,1.407,1.441,1.467,1.487,1.522,1.566,1.59,1.611,1.628,1.654,1.68,1.698,1.746,1.777,1.801,1.866,1.908,1.944,2.015,2.053,2.101,2.137,2.169,2.228,2.316,2.423,2.511,2.593,2.738,2.862,3.094,3.385,3.641,4.096,6.241]},{"maxMu":31.77,"q":[-0.609,-0.126,-0.037,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.036,0.068,0.072,0.096,0.102,0.107,0.13,0.138,0.143,0.148,0.168,0.175,0.183,0.187,0.193,0.205,0.21,0.217,0.222,0.225,0.235,0.246,0.254,0.257,0.266,0.275,0.286,0.29,0.292,0.299,0.308,0.319,0.322,0.326,0.331,0.337,0.35,0.361,0.372,0.38,0.385,0.397,0.404,0.41,0.416,0.428,0.434,0.44,0.445,0.456,0.469,0.474,0.479,0.483,0.491,0.498,0.51,0.515,0.524,0.54,0.55,0.556,0.564,0.574,0.581,0.593,0.606,0.614,0.62,0.626,0.634,0.638,0.654,0.662,0.669,0.674,0.683,0.695,0.705,0.714,0.73,0.737,0.751,0.764,0.777,0.787,0.801,0.816,0.825,0.838,0.843,0.857,0.87,0.882,0.9,0.911,0.923,0.93,0.939,0.953,0.965,0.978,0.986,0.994,1.005,1.014,1.026,1.037,1.05,1.06,1.079,1.102,1.122,1.141,1.154,1.168,1.179,1.199,1.223,1.236,1.253,1.267,1.285,1.303,1.314,1.33,1.352,1.364,1.382,1.394,1.411,1.425,1.444,1.471,1.477,1.491,1.507,1.528,1.556,1.59,1.619,1.639,1.652,1.671,1.702,1.725,1.756,1.787,1.806,1.857,1.893,1.923,1.948,1.996,2.029,2.059,2.114,2.149,2.191,2.239,2.264,2.318,2.378,2.439,2.488,2.573,2.638,2.706,2.774,2.882,2.933,3.015,3.178,3.409,3.623,3.858,5.697]},{"maxMu":40.86,"q":[-0.318,0,0,0,0,0,0,0,0,0,0,0,0,0,0.049,0.063,0.109,0.126,0.144,0.15,0.153,0.171,0.18,0.189,0.205,0.215,0.22,0.235,0.243,0.252,0.269,0.274,0.283,0.289,0.301,0.31,0.319,0.327,0.334,0.348,0.355,0.364,0.374,0.379,0.392,0.4,0.406,0.422,0.433,0.439,0.448,0.457,0.465,0.467,0.477,0.49,0.501,0.506,0.515,0.522,0.529,0.537,0.548,0.561,0.571,0.575,0.586,0.597,0.609,0.617,0.624,0.635,0.644,0.65,0.665,0.675,0.681,0.689,0.699,0.711,0.721,0.731,0.74,0.753,0.761,0.768,0.776,0.789,0.8,0.809,0.818,0.831,0.837,0.845,0.86,0.868,0.882,0.892,0.901,0.911,0.924,0.935,0.944,0.958,0.964,0.978,0.994,1.004,1.014,1.024,1.038,1.051,1.064,1.077,1.085,1.095,1.104,1.114,1.124,1.133,1.145,1.156,1.168,1.18,1.194,1.207,1.215,1.224,1.232,1.251,1.26,1.269,1.28,1.291,1.3,1.311,1.328,1.342,1.363,1.376,1.392,1.409,1.423,1.441,1.454,1.467,1.476,1.496,1.504,1.52,1.534,1.546,1.567,1.579,1.597,1.61,1.628,1.652,1.666,1.684,1.696,1.72,1.735,1.757,1.776,1.801,1.837,1.861,1.876,1.898,1.929,1.953,1.98,2.008,2.029,2.063,2.087,2.122,2.158,2.181,2.228,2.26,2.308,2.347,2.382,2.417,2.448,2.481,2.541,2.582,2.655,2.707,2.784,2.879,2.952,3.093,3.246,3.44,3.64,3.873,5.636]},{"maxMu":1000000000,"q":[-0.098,0,0,0,0.042,0.079,0.114,0.144,0.163,0.182,0.201,0.22,0.241,0.254,0.267,0.288,0.309,0.317,0.327,0.336,0.347,0.364,0.372,0.388,0.401,0.407,0.416,0.433,0.444,0.453,0.464,0.475,0.49,0.498,0.51,0.515,0.524,0.531,0.542,0.555,0.563,0.57,0.583,0.595,0.602,0.612,0.623,0.635,0.647,0.656,0.661,0.672,0.692,0.7,0.713,0.725,0.73,0.742,0.753,0.767,0.781,0.786,0.796,0.805,0.811,0.828,0.834,0.845,0.856,0.863,0.867,0.88,0.889,0.9,0.906,0.912,0.919,0.924,0.93,0.935,0.941,0.953,0.961,0.971,0.983,0.992,0.998,1.003,1.015,1.022,1.036,1.043,1.049,1.056,1.066,1.074,1.083,1.094,1.101,1.111,1.117,1.125,1.135,1.152,1.16,1.172,1.181,1.196,1.208,1.224,1.236,1.244,1.253,1.264,1.275,1.282,1.293,1.303,1.322,1.336,1.346,1.353,1.364,1.379,1.391,1.407,1.42,1.434,1.441,1.449,1.46,1.473,1.48,1.495,1.51,1.52,1.534,1.548,1.569,1.577,1.594,1.61,1.621,1.638,1.652,1.663,1.683,1.692,1.709,1.717,1.725,1.735,1.751,1.779,1.803,1.817,1.827,1.834,1.854,1.868,1.889,1.899,1.919,1.935,1.949,1.978,1.99,2.005,2.031,2.039,2.062,2.078,2.099,2.126,2.139,2.169,2.195,2.208,2.262,2.29,2.308,2.338,2.374,2.417,2.481,2.518,2.567,2.581,2.607,2.643,2.698,2.739,2.802,2.884,2.96,3.123,3.253,3.352,3.5,3.7,4.846]}]},"rushAtt":{"label":"Rush attempts","idx":5,"role":"rush","minMu":3,"kind":"count","priorMode":"league","gamma":0,"decay":0.8,"lastSeason":0.5,"shrink":1,"alpha":0.5,"beta":0,"emp":[{"maxMu":5.62,"q":[0,0,0,0,0,0,0,0,0,0,0.203,0.215,0.229,0.233,0.241,0.253,0.258,0.263,0.266,0.272,0.279,0.282,0.288,0.291,0.294,0.3,0.306,0.314,0.322,0.324,0.33,0.392,0.421,0.433,0.441,0.46,0.474,0.479,0.485,0.499,0.507,0.52,0.529,0.534,0.538,0.539,0.543,0.549,0.553,0.555,0.559,0.568,0.573,0.576,0.583,0.588,0.59,0.592,0.593,0.596,0.602,0.606,0.61,0.616,0.621,0.623,0.631,0.635,0.638,0.64,0.642,0.647,0.651,0.655,0.659,0.678,0.694,0.714,0.717,0.722,0.731,0.736,0.738,0.746,0.757,0.764,0.768,0.779,0.789,0.792,0.796,0.801,0.808,0.809,0.825,0.838,0.845,0.856,0.868,0.875,0.885,0.895,0.897,0.903,0.912,0.914,0.92,0.932,0.938,0.941,0.948,0.951,0.954,0.962,0.972,0.975,0.984,0.988,0.994,1.006,1.025,1.028,1.035,1.044,1.063,1.071,1.082,1.093,1.101,1.109,1.113,1.123,1.13,1.135,1.139,1.146,1.153,1.155,1.163,1.169,1.175,1.181,1.197,1.212,1.221,1.231,1.242,1.25,1.256,1.268,1.275,1.287,1.291,1.302,1.314,1.323,1.333,1.384,1.392,1.414,1.421,1.441,1.455,1.473,1.49,1.493,1.519,1.545,1.578,1.583,1.604,1.611,1.633,1.655,1.659,1.687,1.709,1.712,1.787,1.81,1.824,1.844,1.884,1.912,1.932,1.955,1.969,1.984,2.032,2.074,2.129,2.193,2.232,2.311,2.437,2.459,2.494,2.593,2.76,3.093,4.615]},{"maxMu":8.12,"q":[0.133,0.297,0.347,0.371,0.374,0.379,0.386,0.393,0.395,0.397,0.401,0.408,0.411,0.415,0.426,0.427,0.43,0.432,0.437,0.441,0.446,0.448,0.45,0.453,0.457,0.46,0.466,0.468,0.475,0.477,0.488,0.493,0.499,0.5,0.507,0.509,0.511,0.515,0.518,0.521,0.525,0.526,0.536,0.541,0.548,0.552,0.562,0.567,0.57,0.576,0.579,0.584,0.59,0.598,0.603,0.608,0.613,0.619,0.627,0.633,0.636,0.637,0.642,0.644,0.65,0.652,0.655,0.66,0.663,0.667,0.672,0.676,0.682,0.685,0.69,0.695,0.698,0.698,0.702,0.706,0.711,0.724,0.732,0.739,0.745,0.762,0.765,0.768,0.774,0.78,0.781,0.787,0.796,0.809,0.826,0.829,0.836,0.85,0.861,0.872,0.88,0.883,0.885,0.898,0.902,0.903,0.911,0.915,0.921,0.933,0.947,0.948,0.956,0.965,0.971,0.973,0.981,0.987,0.992,0.997,1.006,1.009,1.018,1.031,1.034,1.042,1.051,1.056,1.063,1.066,1.073,1.094,1.111,1.116,1.123,1.132,1.141,1.151,1.158,1.161,1.165,1.176,1.178,1.187,1.196,1.213,1.222,1.229,1.235,1.241,1.248,1.26,1.271,1.291,1.318,1.356,1.364,1.377,1.388,1.398,1.401,1.414,1.421,1.438,1.478,1.493,1.503,1.522,1.53,1.542,1.572,1.593,1.605,1.616,1.643,1.661,1.672,1.683,1.694,1.707,1.715,1.752,1.777,1.794,1.824,1.891,1.903,1.94,1.993,2.039,2.065,2.151,2.202,2.243,2.351,2.435,2.507,2.581,2.764,3.006,3.433]},{"maxMu":10.81,"q":[0.189,0.282,0.289,0.295,0.314,0.321,0.331,0.339,0.348,0.356,0.359,0.362,0.368,0.382,0.393,0.398,0.408,0.415,0.42,0.425,0.435,0.44,0.445,0.453,0.461,0.465,0.469,0.473,0.483,0.486,0.489,0.492,0.502,0.506,0.522,0.546,0.553,0.558,0.567,0.571,0.577,0.584,0.589,0.595,0.598,0.603,0.607,0.615,0.618,0.627,0.633,0.64,0.652,0.663,0.668,0.672,0.682,0.694,0.7,0.702,0.704,0.709,0.714,0.722,0.725,0.727,0.733,0.741,0.751,0.756,0.761,0.767,0.776,0.786,0.8,0.803,0.808,0.81,0.818,0.825,0.834,0.836,0.844,0.844,0.845,0.848,0.853,0.857,0.865,0.875,0.877,0.885,0.898,0.904,0.916,0.92,0.929,0.94,0.946,0.956,0.96,0.966,0.975,0.981,0.993,0.994,1,1.006,1.013,1.019,1.029,1.044,1.047,1.052,1.057,1.062,1.066,1.079,1.082,1.093,1.112,1.121,1.128,1.138,1.141,1.153,1.158,1.167,1.179,1.191,1.194,1.201,1.208,1.216,1.224,1.235,1.237,1.251,1.274,1.283,1.295,1.3,1.304,1.31,1.317,1.321,1.328,1.335,1.342,1.349,1.358,1.379,1.397,1.411,1.415,1.42,1.426,1.434,1.445,1.456,1.465,1.477,1.485,1.496,1.501,1.504,1.517,1.528,1.546,1.555,1.558,1.567,1.573,1.585,1.598,1.633,1.642,1.66,1.672,1.698,1.706,1.738,1.765,1.768,1.789,1.818,1.844,1.881,1.949,1.969,2.033,2.066,2.086,2.152,2.195,2.294,2.316,2.369,2.549,2.608,3.036]},{"maxMu":13.27,"q":[0.227,0.24,0.256,0.259,0.276,0.302,0.317,0.341,0.346,0.355,0.365,0.367,0.39,0.412,0.424,0.435,0.443,0.453,0.457,0.475,0.487,0.498,0.517,0.526,0.53,0.537,0.543,0.549,0.552,0.554,0.567,0.576,0.584,0.599,0.604,0.608,0.615,0.618,0.621,0.628,0.635,0.637,0.642,0.647,0.66,0.679,0.681,0.684,0.69,0.696,0.701,0.707,0.711,0.718,0.725,0.733,0.739,0.745,0.755,0.759,0.765,0.776,0.78,0.785,0.794,0.796,0.8,0.802,0.805,0.809,0.813,0.817,0.823,0.825,0.831,0.838,0.856,0.86,0.862,0.867,0.872,0.884,0.896,0.901,0.905,0.909,0.912,0.918,0.92,0.926,0.933,0.937,0.954,0.957,0.962,0.973,0.976,0.981,0.987,0.993,0.997,1.004,1.006,1.017,1.02,1.025,1.032,1.037,1.04,1.042,1.052,1.055,1.057,1.063,1.067,1.077,1.079,1.083,1.087,1.089,1.092,1.097,1.105,1.108,1.113,1.133,1.139,1.146,1.148,1.154,1.158,1.166,1.176,1.184,1.189,1.195,1.196,1.205,1.215,1.222,1.227,1.237,1.248,1.251,1.258,1.262,1.265,1.273,1.284,1.289,1.297,1.304,1.322,1.335,1.346,1.35,1.355,1.368,1.384,1.396,1.411,1.418,1.428,1.438,1.447,1.456,1.47,1.476,1.482,1.503,1.51,1.52,1.532,1.539,1.541,1.552,1.567,1.57,1.577,1.585,1.615,1.635,1.65,1.666,1.684,1.703,1.728,1.773,1.807,1.884,1.903,1.953,2.007,2.061,2.078,2.115,2.146,2.176,2.238,2.394,3.052]},{"maxMu":1000000000,"q":[0.179,0.211,0.214,0.263,0.296,0.299,0.357,0.381,0.405,0.414,0.436,0.45,0.46,0.472,0.486,0.493,0.506,0.524,0.525,0.535,0.548,0.554,0.56,0.573,0.577,0.582,0.59,0.6,0.601,0.619,0.625,0.63,0.637,0.642,0.646,0.65,0.655,0.662,0.667,0.669,0.67,0.677,0.68,0.683,0.689,0.696,0.7,0.706,0.715,0.719,0.723,0.728,0.731,0.734,0.736,0.739,0.744,0.746,0.758,0.77,0.776,0.788,0.796,0.804,0.809,0.815,0.822,0.832,0.842,0.846,0.858,0.863,0.863,0.872,0.876,0.882,0.893,0.896,0.898,0.904,0.905,0.908,0.912,0.919,0.923,0.934,0.936,0.943,0.947,0.954,0.962,0.97,0.973,0.976,0.982,0.988,0.995,0.997,1.004,1.008,1.01,1.015,1.028,1.03,1.032,1.034,1.038,1.04,1.042,1.045,1.047,1.048,1.056,1.071,1.077,1.078,1.082,1.087,1.093,1.099,1.103,1.105,1.111,1.117,1.12,1.125,1.131,1.136,1.141,1.147,1.15,1.152,1.157,1.161,1.164,1.168,1.17,1.173,1.181,1.185,1.191,1.194,1.204,1.213,1.218,1.233,1.236,1.239,1.249,1.25,1.257,1.263,1.273,1.284,1.289,1.295,1.307,1.315,1.325,1.334,1.34,1.345,1.356,1.361,1.382,1.39,1.393,1.398,1.403,1.414,1.425,1.432,1.441,1.449,1.457,1.47,1.491,1.497,1.505,1.516,1.519,1.547,1.56,1.563,1.571,1.598,1.61,1.628,1.651,1.663,1.676,1.703,1.724,1.747,1.766,1.785,1.843,1.869,1.913,2.008,2.189]}]},"rushYds":{"label":"Rushing yards","idx":6,"role":"rush","minMu":12,"kind":"yards","priorMode":"league","gamma":0,"decay":0.8,"lastSeason":0.5,"shrink":6,"alpha":0.5,"beta":0,"emp":[{"maxMu":18.64,"q":[-0.49,-0.33,-0.314,-0.271,-0.222,-0.19,-0.16,-0.146,-0.143,-0.137,-0.116,-0.081,-0.08,-0.079,-0.076,-0.075,-0.073,-0.07,-0.067,-0.065,-0.058,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.058,0.061,0.066,0.069,0.072,0.073,0.075,0.078,0.08,0.081,0.113,0.118,0.124,0.134,0.144,0.148,0.154,0.161,0.165,0.167,0.18,0.199,0.212,0.22,0.224,0.231,0.235,0.24,0.245,0.249,0.267,0.281,0.292,0.302,0.31,0.321,0.326,0.332,0.343,0.357,0.362,0.38,0.399,0.404,0.408,0.416,0.424,0.435,0.442,0.445,0.452,0.467,0.479,0.484,0.489,0.505,0.513,0.536,0.54,0.548,0.555,0.57,0.581,0.605,0.614,0.626,0.634,0.637,0.655,0.675,0.682,0.707,0.723,0.728,0.737,0.754,0.766,0.787,0.804,0.815,0.837,0.851,0.875,0.897,0.91,0.921,0.928,0.939,0.946,0.97,0.997,1.005,1.031,1.075,1.103,1.111,1.119,1.136,1.162,1.194,1.2,1.244,1.251,1.272,1.3,1.316,1.33,1.343,1.363,1.378,1.411,1.427,1.477,1.484,1.499,1.528,1.545,1.581,1.603,1.634,1.659,1.672,1.685,1.722,1.76,1.78,1.81,1.88,1.893,2.022,2.069,2.119,2.158,2.269,2.308,2.329,2.434,2.492,2.554,2.584,2.61,2.635,2.672,2.72,2.803,2.913,3.01,3.04,3.109,3.282,3.549,3.785,4.112,4.827,6.43]},{"maxMu":37.53,"q":[-0.251,-0.105,-0.03,0,0,0,0,0.038,0.054,0.073,0.096,0.106,0.113,0.117,0.135,0.148,0.164,0.169,0.174,0.189,0.198,0.214,0.217,0.223,0.23,0.233,0.238,0.259,0.271,0.281,0.293,0.298,0.305,0.309,0.312,0.325,0.329,0.343,0.351,0.355,0.358,0.361,0.365,0.374,0.384,0.389,0.403,0.406,0.409,0.413,0.426,0.446,0.457,0.466,0.478,0.482,0.488,0.496,0.501,0.516,0.519,0.521,0.528,0.536,0.541,0.547,0.558,0.563,0.567,0.57,0.578,0.585,0.592,0.595,0.613,0.618,0.625,0.636,0.647,0.657,0.664,0.673,0.676,0.679,0.688,0.697,0.708,0.72,0.73,0.737,0.747,0.75,0.764,0.772,0.776,0.787,0.795,0.807,0.82,0.826,0.83,0.84,0.849,0.856,0.865,0.873,0.887,0.902,0.911,0.921,0.93,0.935,0.955,0.964,0.983,0.99,0.994,1.009,1.027,1.055,1.063,1.069,1.081,1.09,1.098,1.119,1.13,1.143,1.161,1.171,1.186,1.201,1.21,1.224,1.232,1.266,1.27,1.278,1.291,1.296,1.305,1.31,1.321,1.325,1.342,1.356,1.372,1.391,1.421,1.43,1.442,1.456,1.486,1.501,1.509,1.536,1.556,1.567,1.59,1.613,1.635,1.653,1.679,1.704,1.718,1.734,1.756,1.77,1.798,1.824,1.871,1.894,1.942,1.959,2.013,2.054,2.083,2.106,2.12,2.186,2.223,2.237,2.266,2.28,2.331,2.351,2.389,2.432,2.529,2.565,2.597,2.688,2.839,2.907,3.026,3.142,3.361,3.682,4.173,4.753,5.388]},{"maxMu":44.14,"q":[-0.132,-0.05,0.024,0.026,0.05,0.07,0.074,0.078,0.1,0.106,0.124,0.126,0.131,0.145,0.152,0.156,0.176,0.18,0.184,0.202,0.208,0.212,0.225,0.234,0.246,0.257,0.27,0.278,0.286,0.291,0.3,0.309,0.313,0.323,0.325,0.333,0.34,0.345,0.352,0.358,0.364,0.371,0.378,0.388,0.398,0.406,0.409,0.41,0.417,0.424,0.426,0.432,0.437,0.445,0.456,0.461,0.467,0.473,0.48,0.488,0.496,0.497,0.503,0.509,0.512,0.515,0.525,0.533,0.549,0.551,0.555,0.568,0.574,0.577,0.583,0.589,0.594,0.6,0.607,0.611,0.617,0.621,0.631,0.643,0.648,0.661,0.669,0.679,0.687,0.704,0.708,0.711,0.715,0.731,0.74,0.75,0.752,0.765,0.772,0.781,0.783,0.79,0.798,0.806,0.808,0.819,0.825,0.838,0.84,0.865,0.874,0.882,0.885,0.889,0.899,0.91,0.915,0.925,0.934,0.944,0.951,0.969,0.982,0.997,1.005,1.012,1.016,1.026,1.029,1.034,1.044,1.06,1.075,1.088,1.111,1.114,1.133,1.144,1.156,1.166,1.175,1.185,1.193,1.214,1.223,1.229,1.249,1.266,1.285,1.311,1.317,1.321,1.347,1.356,1.364,1.374,1.385,1.398,1.419,1.446,1.457,1.481,1.489,1.515,1.52,1.547,1.558,1.567,1.573,1.595,1.607,1.62,1.632,1.667,1.681,1.712,1.738,1.783,1.801,1.844,1.913,1.932,1.957,1.999,2.034,2.075,2.142,2.192,2.308,2.344,2.433,2.533,2.605,2.679,2.807,2.896,3.004,3.13,3.36,3.595,4.057]},{"maxMu":51.18,"q":[-0.125,0,0.045,0.106,0.127,0.135,0.151,0.175,0.189,0.19,0.21,0.223,0.235,0.241,0.245,0.248,0.258,0.271,0.28,0.288,0.296,0.314,0.323,0.328,0.338,0.343,0.352,0.366,0.374,0.382,0.395,0.398,0.407,0.416,0.425,0.433,0.439,0.452,0.477,0.487,0.492,0.5,0.513,0.523,0.527,0.53,0.532,0.541,0.543,0.552,0.561,0.575,0.582,0.591,0.596,0.6,0.604,0.612,0.615,0.622,0.633,0.643,0.653,0.663,0.672,0.676,0.681,0.691,0.693,0.703,0.711,0.721,0.725,0.74,0.746,0.759,0.765,0.775,0.784,0.79,0.796,0.804,0.81,0.827,0.831,0.84,0.854,0.866,0.875,0.88,0.895,0.897,0.902,0.907,0.912,0.934,0.939,0.948,0.96,0.972,0.976,0.98,0.987,0.992,0.994,1,1.009,1.026,1.033,1.037,1.042,1.05,1.054,1.061,1.066,1.074,1.085,1.093,1.098,1.105,1.108,1.124,1.128,1.148,1.154,1.171,1.178,1.182,1.193,1.198,1.207,1.213,1.232,1.245,1.255,1.261,1.266,1.284,1.294,1.302,1.305,1.32,1.324,1.332,1.348,1.364,1.377,1.389,1.411,1.42,1.425,1.433,1.446,1.453,1.467,1.476,1.487,1.492,1.505,1.528,1.534,1.542,1.546,1.556,1.572,1.605,1.615,1.624,1.64,1.661,1.664,1.7,1.745,1.755,1.798,1.821,1.854,1.883,1.938,1.952,1.989,2.041,2.068,2.092,2.138,2.17,2.195,2.215,2.27,2.324,2.373,2.47,2.486,2.605,2.644,2.769,2.836,2.887,2.912,3.156,3.533]},{"maxMu":1000000000,"q":[-0.071,0.058,0.137,0.154,0.171,0.182,0.195,0.221,0.238,0.273,0.285,0.3,0.326,0.332,0.339,0.347,0.356,0.374,0.397,0.409,0.426,0.44,0.445,0.451,0.465,0.47,0.476,0.481,0.486,0.497,0.508,0.52,0.53,0.544,0.557,0.561,0.566,0.574,0.578,0.587,0.592,0.603,0.61,0.618,0.628,0.642,0.647,0.653,0.663,0.674,0.683,0.688,0.693,0.698,0.703,0.713,0.726,0.731,0.742,0.745,0.752,0.755,0.763,0.767,0.78,0.789,0.797,0.809,0.813,0.819,0.84,0.852,0.864,0.872,0.878,0.883,0.891,0.911,0.924,0.934,0.95,0.963,0.97,0.975,0.989,0.993,0.995,1.002,1.007,1.016,1.02,1.023,1.025,1.036,1.044,1.056,1.061,1.071,1.077,1.087,1.094,1.097,1.104,1.119,1.125,1.13,1.134,1.138,1.14,1.146,1.154,1.162,1.176,1.193,1.196,1.201,1.214,1.219,1.223,1.234,1.249,1.262,1.272,1.279,1.29,1.302,1.313,1.321,1.334,1.345,1.348,1.353,1.358,1.366,1.372,1.378,1.394,1.411,1.423,1.427,1.442,1.451,1.462,1.474,1.498,1.505,1.513,1.528,1.537,1.562,1.574,1.583,1.588,1.607,1.611,1.628,1.641,1.649,1.662,1.67,1.679,1.696,1.72,1.739,1.747,1.761,1.773,1.785,1.798,1.821,1.864,1.873,1.902,1.909,1.923,1.935,1.982,2.015,2.048,2.059,2.074,2.08,2.099,2.12,2.14,2.193,2.211,2.223,2.251,2.273,2.319,2.389,2.439,2.475,2.51,2.675,2.804,2.898,2.958,3.226,3.566]}]},"cmp":{"label":"Completions","idx":0,"role":"pass","minMu":12,"kind":"count","priorMode":"league","gamma":0,"decay":1,"lastSeason":0.5,"shrink":3,"alpha":0.5,"beta":0,"emp":[{"maxMu":19.34,"q":[0.196,0.21,0.254,0.267,0.277,0.28,0.342,0.357,0.367,0.373,0.386,0.414,0.42,0.423,0.448,0.465,0.467,0.468,0.48,0.493,0.497,0.527,0.532,0.54,0.555,0.586,0.588,0.603,0.608,0.631,0.636,0.661,0.673,0.68,0.681,0.69,0.692,0.693,0.702,0.703,0.711,0.727,0.73,0.733,0.744,0.748,0.749,0.749,0.752,0.76,0.764,0.773,0.777,0.782,0.785,0.789,0.792,0.795,0.796,0.809,0.816,0.824,0.83,0.838,0.839,0.849,0.854,0.861,0.864,0.866,0.878,0.878,0.88,0.881,0.885,0.89,0.899,0.901,0.908,0.91,0.914,0.918,0.92,0.922,0.923,0.93,0.937,0.945,0.946,0.949,0.949,0.952,0.953,0.958,0.961,0.966,0.969,0.977,0.986,0.99,0.99,0.991,0.998,1,1.006,1.015,1.018,1.02,1.024,1.024,1.031,1.033,1.037,1.041,1.049,1.051,1.06,1.061,1.066,1.076,1.079,1.084,1.093,1.097,1.101,1.102,1.103,1.108,1.108,1.112,1.116,1.128,1.137,1.141,1.142,1.143,1.152,1.156,1.171,1.174,1.186,1.187,1.191,1.192,1.198,1.198,1.203,1.204,1.206,1.207,1.21,1.212,1.212,1.218,1.223,1.231,1.236,1.241,1.241,1.242,1.243,1.256,1.258,1.268,1.273,1.287,1.299,1.308,1.309,1.31,1.324,1.328,1.342,1.345,1.363,1.373,1.379,1.382,1.385,1.387,1.398,1.398,1.41,1.447,1.456,1.466,1.467,1.489,1.491,1.542,1.574,1.612,1.635,1.664,1.678,1.731,1.749,1.782,1.788,2.005,2.172]},{"maxMu":20.88,"q":[0.257,0.291,0.336,0.337,0.401,0.434,0.455,0.481,0.528,0.535,0.541,0.587,0.6,0.605,0.624,0.628,0.643,0.645,0.648,0.66,0.669,0.674,0.674,0.684,0.689,0.711,0.715,0.732,0.733,0.734,0.74,0.743,0.744,0.744,0.748,0.749,0.754,0.763,0.767,0.769,0.775,0.775,0.789,0.79,0.791,0.794,0.803,0.804,0.812,0.813,0.817,0.817,0.819,0.821,0.821,0.822,0.823,0.824,0.825,0.837,0.838,0.839,0.84,0.843,0.844,0.856,0.858,0.861,0.865,0.866,0.871,0.872,0.877,0.877,0.885,0.89,0.895,0.896,0.899,0.904,0.906,0.91,0.911,0.912,0.916,0.918,0.92,0.927,0.928,0.93,0.933,0.934,0.936,0.953,0.955,0.957,0.96,0.964,0.964,0.967,0.967,0.969,0.973,0.974,0.982,0.985,0.991,0.992,0.998,1,1.007,1.009,1.013,1.014,1.02,1.021,1.022,1.025,1.026,1.029,1.036,1.039,1.039,1.04,1.045,1.05,1.053,1.055,1.062,1.064,1.065,1.071,1.072,1.074,1.075,1.075,1.082,1.084,1.086,1.087,1.095,1.102,1.113,1.114,1.118,1.119,1.121,1.121,1.13,1.13,1.135,1.136,1.136,1.143,1.147,1.157,1.159,1.167,1.167,1.178,1.181,1.184,1.186,1.186,1.191,1.2,1.203,1.206,1.21,1.213,1.215,1.24,1.25,1.261,1.276,1.277,1.279,1.279,1.299,1.3,1.304,1.317,1.32,1.331,1.356,1.361,1.38,1.393,1.4,1.412,1.421,1.43,1.433,1.466,1.479,1.545,1.566,1.596,1.6,1.631,1.732]},{"maxMu":22.34,"q":[0.285,0.321,0.372,0.374,0.47,0.472,0.493,0.496,0.508,0.51,0.52,0.556,0.561,0.565,0.592,0.597,0.602,0.61,0.611,0.613,0.621,0.633,0.646,0.656,0.656,0.665,0.665,0.67,0.68,0.689,0.692,0.695,0.696,0.706,0.711,0.718,0.72,0.726,0.734,0.743,0.752,0.763,0.772,0.774,0.788,0.789,0.793,0.8,0.802,0.808,0.812,0.817,0.823,0.833,0.84,0.849,0.853,0.854,0.86,0.864,0.864,0.864,0.864,0.867,0.872,0.877,0.881,0.885,0.888,0.888,0.893,0.897,0.899,0.9,0.904,0.909,0.91,0.917,0.924,0.926,0.93,0.931,0.931,0.933,0.934,0.94,0.941,0.942,0.944,0.948,0.949,0.953,0.965,0.966,0.972,0.979,0.981,0.989,0.991,0.995,0.995,0.996,0.999,1.001,1.004,1.005,1.008,1.008,1.011,1.012,1.03,1.03,1.032,1.033,1.035,1.036,1.038,1.039,1.05,1.055,1.056,1.059,1.059,1.066,1.067,1.081,1.083,1.086,1.091,1.094,1.101,1.106,1.118,1.119,1.12,1.122,1.126,1.128,1.129,1.131,1.132,1.134,1.141,1.146,1.151,1.153,1.166,1.168,1.171,1.172,1.174,1.176,1.177,1.179,1.179,1.182,1.183,1.191,1.193,1.196,1.214,1.215,1.22,1.224,1.228,1.235,1.24,1.243,1.246,1.255,1.257,1.264,1.267,1.268,1.273,1.273,1.288,1.291,1.295,1.3,1.306,1.306,1.321,1.324,1.327,1.33,1.343,1.367,1.368,1.383,1.387,1.395,1.399,1.425,1.445,1.447,1.5,1.526,1.59,1.733,1.838]},{"maxMu":24.04,"q":[0.222,0.268,0.351,0.353,0.463,0.472,0.483,0.486,0.514,0.53,0.534,0.553,0.561,0.561,0.57,0.575,0.592,0.594,0.605,0.615,0.626,0.647,0.647,0.653,0.669,0.685,0.686,0.696,0.704,0.707,0.708,0.711,0.713,0.753,0.757,0.758,0.758,0.768,0.775,0.777,0.782,0.787,0.798,0.798,0.803,0.803,0.811,0.812,0.823,0.824,0.829,0.832,0.835,0.838,0.843,0.846,0.847,0.861,0.861,0.867,0.872,0.878,0.879,0.882,0.883,0.888,0.891,0.892,0.893,0.895,0.895,0.895,0.9,0.904,0.909,0.915,0.917,0.92,0.925,0.926,0.932,0.935,0.938,0.939,0.944,0.945,0.948,0.953,0.955,0.961,0.963,0.969,0.97,0.973,0.974,0.983,0.983,0.989,0.993,0.995,0.995,1,1.006,1.007,1.009,1.009,1.01,1.011,1.014,1.019,1.024,1.025,1.028,1.029,1.031,1.033,1.042,1.043,1.048,1.051,1.054,1.057,1.058,1.069,1.073,1.075,1.078,1.08,1.081,1.083,1.088,1.101,1.102,1.107,1.108,1.112,1.113,1.113,1.118,1.118,1.123,1.127,1.128,1.132,1.134,1.136,1.138,1.14,1.143,1.144,1.147,1.151,1.154,1.158,1.16,1.161,1.162,1.167,1.168,1.17,1.171,1.18,1.184,1.191,1.195,1.201,1.205,1.208,1.23,1.234,1.241,1.251,1.256,1.258,1.265,1.266,1.294,1.297,1.299,1.3,1.304,1.308,1.312,1.313,1.327,1.335,1.339,1.367,1.368,1.384,1.407,1.417,1.42,1.449,1.455,1.479,1.549,1.578,1.686,1.8,1.863]},{"maxMu":1000000000,"q":[0.354,0.355,0.435,0.452,0.453,0.46,0.473,0.527,0.578,0.58,0.603,0.608,0.609,0.61,0.62,0.635,0.636,0.666,0.672,0.69,0.694,0.698,0.701,0.714,0.719,0.734,0.739,0.747,0.749,0.755,0.765,0.77,0.775,0.775,0.781,0.782,0.786,0.787,0.791,0.794,0.801,0.803,0.806,0.807,0.811,0.815,0.817,0.826,0.826,0.829,0.83,0.834,0.843,0.845,0.847,0.851,0.852,0.855,0.859,0.861,0.868,0.869,0.87,0.87,0.874,0.88,0.893,0.896,0.9,0.901,0.903,0.904,0.906,0.908,0.909,0.91,0.912,0.913,0.915,0.918,0.919,0.921,0.923,0.93,0.932,0.933,0.935,0.936,0.945,0.946,0.947,0.948,0.951,0.954,0.954,0.955,0.956,0.958,0.962,0.965,0.971,0.972,0.975,0.978,0.98,0.99,0.99,0.992,0.992,0.997,0.997,1,1.002,1.01,1.011,1.011,1.015,1.015,1.021,1.022,1.027,1.028,1.039,1.039,1.041,1.051,1.052,1.062,1.07,1.074,1.075,1.075,1.079,1.084,1.085,1.09,1.092,1.097,1.1,1.104,1.104,1.107,1.11,1.113,1.121,1.121,1.128,1.129,1.135,1.139,1.142,1.143,1.15,1.15,1.152,1.157,1.161,1.161,1.161,1.167,1.174,1.184,1.187,1.19,1.192,1.193,1.193,1.202,1.208,1.217,1.222,1.228,1.23,1.23,1.232,1.235,1.241,1.259,1.265,1.268,1.281,1.282,1.289,1.291,1.313,1.321,1.326,1.329,1.331,1.347,1.355,1.361,1.366,1.396,1.403,1.438,1.477,1.481,1.497,1.63,1.702]}]},"passYds":{"label":"Passing yards","idx":2,"role":"pass","minMu":150,"kind":"yards","priorMode":"league","gamma":0,"decay":1,"lastSeason":0.5,"shrink":6,"alpha":0.5,"beta":0,"emp":[{"maxMu":215.03,"q":[0.048,0.126,0.204,0.212,0.263,0.266,0.272,0.282,0.309,0.314,0.352,0.352,0.362,0.39,0.392,0.396,0.419,0.431,0.436,0.457,0.474,0.49,0.493,0.523,0.523,0.535,0.542,0.556,0.557,0.561,0.572,0.581,0.595,0.612,0.617,0.62,0.626,0.641,0.644,0.647,0.653,0.657,0.662,0.663,0.665,0.673,0.675,0.676,0.689,0.69,0.702,0.703,0.704,0.709,0.714,0.719,0.724,0.743,0.748,0.768,0.773,0.778,0.778,0.787,0.788,0.792,0.795,0.796,0.803,0.81,0.826,0.83,0.839,0.841,0.847,0.848,0.857,0.858,0.861,0.862,0.87,0.871,0.886,0.887,0.893,0.895,0.896,0.897,0.898,0.909,0.91,0.913,0.916,0.921,0.925,0.932,0.932,0.942,0.947,0.952,0.953,0.954,0.955,0.956,0.965,0.966,0.972,0.974,0.977,0.987,0.989,0.995,0.997,1.003,1.008,1.016,1.028,1.028,1.033,1.063,1.064,1.072,1.079,1.095,1.095,1.102,1.102,1.105,1.106,1.106,1.109,1.119,1.119,1.123,1.126,1.133,1.138,1.138,1.144,1.145,1.148,1.149,1.152,1.153,1.16,1.16,1.165,1.166,1.182,1.184,1.197,1.199,1.207,1.217,1.222,1.233,1.246,1.25,1.255,1.266,1.267,1.277,1.283,1.296,1.297,1.317,1.319,1.323,1.329,1.335,1.37,1.387,1.406,1.407,1.439,1.449,1.463,1.464,1.479,1.482,1.487,1.494,1.504,1.509,1.514,1.524,1.529,1.535,1.543,1.564,1.568,1.585,1.592,1.604,1.634,1.677,1.681,1.764,1.807,1.858,2.059]},{"maxMu":230.32,"q":[0.223,0.245,0.252,0.315,0.323,0.352,0.4,0.403,0.444,0.444,0.453,0.454,0.491,0.492,0.525,0.533,0.539,0.543,0.543,0.547,0.548,0.564,0.58,0.592,0.603,0.61,0.618,0.618,0.627,0.637,0.64,0.644,0.645,0.652,0.655,0.655,0.664,0.665,0.688,0.694,0.707,0.713,0.72,0.725,0.73,0.73,0.751,0.753,0.757,0.758,0.771,0.776,0.781,0.781,0.783,0.786,0.788,0.791,0.792,0.796,0.801,0.809,0.811,0.821,0.821,0.836,0.838,0.842,0.845,0.849,0.851,0.854,0.864,0.866,0.867,0.868,0.873,0.875,0.882,0.883,0.886,0.887,0.892,0.898,0.901,0.902,0.902,0.915,0.916,0.92,0.921,0.926,0.927,0.929,0.932,0.939,0.941,0.944,0.945,0.946,0.948,0.954,0.956,0.959,0.965,0.969,0.975,0.976,0.981,0.984,0.993,0.995,1.003,1.01,1.012,1.013,1.017,1.018,1.018,1.023,1.027,1.03,1.031,1.032,1.036,1.045,1.046,1.049,1.053,1.069,1.074,1.078,1.081,1.091,1.092,1.093,1.1,1.104,1.109,1.11,1.115,1.116,1.118,1.126,1.132,1.144,1.147,1.154,1.162,1.168,1.172,1.174,1.174,1.18,1.181,1.186,1.188,1.204,1.207,1.22,1.22,1.223,1.224,1.229,1.232,1.242,1.246,1.257,1.265,1.265,1.282,1.286,1.29,1.322,1.326,1.33,1.349,1.35,1.363,1.365,1.4,1.402,1.419,1.425,1.426,1.429,1.435,1.436,1.44,1.453,1.46,1.466,1.466,1.492,1.497,1.51,1.521,1.623,1.644,1.772,1.902]},{"maxMu":243.34,"q":[0.23,0.304,0.404,0.412,0.447,0.46,0.479,0.504,0.515,0.516,0.522,0.535,0.559,0.565,0.599,0.607,0.614,0.639,0.646,0.654,0.654,0.658,0.66,0.666,0.673,0.679,0.68,0.686,0.686,0.701,0.707,0.712,0.713,0.716,0.722,0.724,0.731,0.736,0.745,0.745,0.762,0.763,0.766,0.767,0.772,0.773,0.786,0.792,0.793,0.799,0.805,0.811,0.811,0.816,0.818,0.821,0.821,0.829,0.829,0.836,0.84,0.842,0.842,0.851,0.852,0.866,0.866,0.876,0.884,0.891,0.894,0.895,0.899,0.904,0.91,0.91,0.914,0.919,0.924,0.925,0.926,0.934,0.938,0.943,0.947,0.953,0.953,0.96,0.963,0.964,0.966,0.969,0.97,0.972,0.973,0.974,0.98,0.983,0.984,0.988,0.988,0.996,0.997,0.997,1,1.006,1.016,1.019,1.021,1.022,1.024,1.025,1.028,1.03,1.031,1.035,1.042,1.043,1.043,1.05,1.052,1.055,1.059,1.062,1.065,1.067,1.068,1.07,1.07,1.075,1.075,1.078,1.088,1.096,1.103,1.106,1.119,1.126,1.129,1.133,1.134,1.136,1.14,1.141,1.149,1.154,1.159,1.168,1.174,1.175,1.178,1.186,1.188,1.189,1.202,1.21,1.213,1.243,1.247,1.248,1.248,1.253,1.258,1.273,1.273,1.282,1.282,1.285,1.289,1.29,1.296,1.297,1.32,1.323,1.332,1.333,1.34,1.345,1.36,1.374,1.39,1.399,1.411,1.421,1.43,1.444,1.454,1.465,1.477,1.489,1.502,1.519,1.553,1.554,1.573,1.625,1.641,1.709,1.712,1.909,1.941]},{"maxMu":262.12,"q":[0.337,0.364,0.382,0.386,0.402,0.402,0.43,0.447,0.461,0.486,0.523,0.525,0.557,0.566,0.568,0.569,0.573,0.575,0.576,0.589,0.603,0.618,0.622,0.634,0.636,0.642,0.649,0.669,0.672,0.676,0.678,0.691,0.705,0.709,0.72,0.722,0.731,0.732,0.739,0.756,0.759,0.76,0.763,0.78,0.782,0.786,0.79,0.793,0.798,0.8,0.808,0.811,0.813,0.82,0.824,0.824,0.824,0.827,0.832,0.848,0.849,0.855,0.855,0.863,0.863,0.865,0.866,0.868,0.868,0.868,0.878,0.88,0.884,0.885,0.891,0.893,0.895,0.902,0.905,0.905,0.909,0.91,0.923,0.929,0.931,0.936,0.937,0.941,0.943,0.947,0.948,0.95,0.953,0.956,0.957,0.967,0.969,0.972,0.973,0.976,0.978,0.979,0.982,0.982,0.984,0.984,0.994,0.998,1.005,1.005,1.009,1.011,1.021,1.021,1.027,1.033,1.039,1.042,1.043,1.044,1.048,1.057,1.058,1.06,1.062,1.063,1.067,1.069,1.07,1.075,1.078,1.083,1.084,1.092,1.098,1.099,1.117,1.117,1.13,1.13,1.134,1.135,1.147,1.147,1.154,1.163,1.175,1.176,1.178,1.18,1.189,1.189,1.2,1.202,1.203,1.206,1.208,1.221,1.222,1.229,1.234,1.244,1.248,1.256,1.256,1.269,1.27,1.273,1.277,1.286,1.288,1.289,1.297,1.298,1.32,1.327,1.35,1.356,1.359,1.374,1.376,1.378,1.389,1.409,1.419,1.432,1.434,1.442,1.472,1.49,1.493,1.5,1.517,1.522,1.529,1.569,1.569,1.63,1.639,1.654,1.855]},{"maxMu":1000000000,"q":[0.248,0.29,0.435,0.44,0.519,0.525,0.563,0.595,0.622,0.623,0.647,0.648,0.653,0.654,0.66,0.662,0.665,0.668,0.669,0.676,0.684,0.696,0.701,0.712,0.724,0.725,0.726,0.732,0.734,0.735,0.739,0.741,0.747,0.747,0.751,0.752,0.754,0.754,0.756,0.763,0.766,0.768,0.775,0.79,0.793,0.804,0.807,0.816,0.818,0.821,0.822,0.827,0.834,0.845,0.845,0.862,0.863,0.864,0.864,0.864,0.866,0.869,0.877,0.879,0.881,0.882,0.887,0.888,0.89,0.89,0.891,0.892,0.892,0.895,0.898,0.903,0.904,0.907,0.909,0.911,0.911,0.918,0.921,0.923,0.925,0.926,0.927,0.93,0.941,0.949,0.954,0.956,0.971,0.971,0.973,0.974,0.978,0.979,0.979,0.982,0.985,0.986,0.987,0.992,0.994,1.006,1.006,1.009,1.01,1.013,1.014,1.017,1.019,1.023,1.023,1.024,1.026,1.031,1.036,1.04,1.048,1.05,1.053,1.054,1.059,1.06,1.064,1.075,1.082,1.085,1.089,1.092,1.093,1.095,1.101,1.108,1.109,1.109,1.115,1.119,1.119,1.121,1.124,1.124,1.126,1.127,1.133,1.133,1.146,1.149,1.155,1.159,1.161,1.163,1.181,1.184,1.187,1.198,1.2,1.206,1.213,1.221,1.223,1.227,1.23,1.237,1.239,1.242,1.243,1.266,1.269,1.271,1.274,1.275,1.276,1.277,1.29,1.29,1.296,1.305,1.315,1.32,1.332,1.336,1.366,1.378,1.384,1.391,1.402,1.422,1.423,1.428,1.452,1.488,1.493,1.532,1.559,1.579,1.656,1.692,1.97]}]},"passTD":{"label":"Passing TDs","idx":3,"role":"pass","minMu":0.5,"kind":"count","priorMode":"league","gamma":0.5,"decay":1,"lastSeason":1,"shrink":6,"alpha":0,"beta":0,"emp":[{"maxMu":1.16,"q":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.865,0.866,0.868,0.874,0.874,0.879,0.881,0.882,0.883,0.884,0.887,0.888,0.89,0.89,0.893,0.9,0.901,0.902,0.908,0.908,0.917,0.922,0.925,0.927,0.936,0.937,0.942,0.952,0.953,0.962,0.965,0.966,0.97,0.974,0.975,0.976,0.982,0.985,0.986,0.988,0.99,0.995,0.996,1.001,1.003,1.014,1.028,1.029,1.037,1.048,1.051,1.057,1.069,1.069,1.077,1.08,1.095,1.096,1.11,1.119,1.121,1.136,1.136,1.143,1.144,1.158,1.179,1.236,1.241,1.268,1.272,1.305,1.31,1.538,1.732,1.75,1.753,1.754,1.771,1.776,1.78,1.787,1.788,1.788,1.796,1.796,1.807,1.819,1.829,1.849,1.871,1.871,1.874,1.878,1.882,1.891,1.905,1.913,1.913,1.925,1.944,1.961,1.983,2.065,2.067,2.097,2.131,2.162,2.178,2.18,2.252,2.336,2.395,2.506,2.56,2.635,2.679,2.682,2.766,2.791,2.878,2.899,3.079,3.183,3.537,3.719]},{"maxMu":1.33,"q":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.753,0.753,0.755,0.755,0.756,0.756,0.758,0.758,0.761,0.762,0.765,0.767,0.768,0.771,0.771,0.773,0.773,0.775,0.776,0.776,0.777,0.778,0.779,0.782,0.783,0.784,0.786,0.786,0.787,0.787,0.791,0.794,0.795,0.797,0.798,0.798,0.799,0.8,0.801,0.802,0.806,0.809,0.812,0.813,0.814,0.818,0.818,0.82,0.82,0.826,0.827,0.828,0.829,0.831,0.832,0.837,0.838,0.839,0.84,0.841,0.842,0.842,0.844,0.846,0.847,0.847,0.854,0.854,0.855,0.856,0.859,0.861,1.507,1.508,1.513,1.516,1.518,1.523,1.524,1.532,1.536,1.537,1.539,1.54,1.54,1.552,1.553,1.555,1.557,1.558,1.561,1.569,1.57,1.577,1.579,1.582,1.588,1.596,1.599,1.601,1.605,1.606,1.619,1.62,1.624,1.625,1.631,1.638,1.65,1.65,1.652,1.658,1.658,1.673,1.673,1.677,1.678,1.69,1.715,1.72,1.721,2.272,2.274,2.33,2.333,2.349,2.363,2.379,2.392,2.42,2.475,2.477,2.503,2.516,2.543,2.576,3.047,3.088,3.123,3.19,3.244,3.294,3.406,3.778]},{"maxMu":1.51,"q":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.663,0.666,0.668,0.669,0.67,0.672,0.675,0.675,0.676,0.676,0.677,0.678,0.678,0.68,0.68,0.683,0.684,0.687,0.688,0.69,0.692,0.696,0.696,0.698,0.699,0.699,0.701,0.701,0.702,0.702,0.703,0.704,0.704,0.705,0.706,0.706,0.709,0.709,0.711,0.711,0.716,0.718,0.718,0.72,0.72,0.72,0.721,0.721,0.721,0.725,0.725,0.727,0.727,0.73,0.731,0.734,0.735,0.735,0.737,0.737,0.739,0.739,0.741,0.742,0.743,0.746,0.747,0.748,0.749,0.749,0.75,0.75,1.327,1.33,1.332,1.34,1.34,1.348,1.348,1.352,1.356,1.36,1.361,1.363,1.363,1.366,1.367,1.37,1.376,1.385,1.389,1.391,1.391,1.395,1.405,1.406,1.407,1.407,1.412,1.412,1.421,1.422,1.426,1.431,1.435,1.435,1.436,1.436,1.44,1.454,1.455,1.464,1.464,1.465,1.466,1.467,1.467,1.476,1.476,1.478,1.478,1.48,1.481,1.482,1.484,1.488,1.495,1.495,1.499,1.5,1.987,2.007,2.017,2.018,2.031,2.035,2.049,2.068,2.091,2.096,2.11,2.13,2.165,2.174,2.179,2.195,2.199,2.236,2.236,2.247,2.258,2.677,2.746,2.811,2.909,3.597,4.463]},{"maxMu":1.81,"q":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.552,0.553,0.553,0.554,0.556,0.561,0.561,0.561,0.563,0.568,0.569,0.569,0.57,0.571,0.574,0.575,0.576,0.577,0.579,0.58,0.583,0.584,0.585,0.587,0.588,0.589,0.59,0.591,0.591,0.595,0.595,0.596,0.598,0.599,0.601,0.604,0.605,0.607,0.607,0.609,0.61,0.612,0.612,0.612,0.615,0.617,0.619,0.62,0.622,0.622,0.623,0.624,0.624,0.626,0.627,0.628,0.628,0.629,0.631,0.635,0.637,0.638,0.638,0.639,0.64,0.643,0.645,0.647,0.647,0.649,0.649,0.65,0.653,0.654,0.654,0.658,0.66,0.661,0.662,1.107,1.111,1.113,1.115,1.117,1.123,1.126,1.133,1.134,1.136,1.14,1.149,1.149,1.15,1.155,1.158,1.178,1.181,1.183,1.187,1.192,1.192,1.204,1.206,1.214,1.216,1.219,1.219,1.222,1.223,1.225,1.225,1.235,1.239,1.242,1.25,1.252,1.263,1.271,1.274,1.275,1.278,1.28,1.291,1.291,1.3,1.302,1.306,1.307,1.309,1.312,1.312,1.321,1.322,1.668,1.672,1.686,1.686,1.705,1.71,1.723,1.724,1.743,1.746,1.75,1.763,1.765,1.771,1.779,1.801,1.82,1.838,1.848,1.861,1.867,1.876,1.89,1.894,1.902,1.923,1.936,1.936,1.961,1.967,1.986,2.227,2.265,2.272,2.35,2.397,2.44,2.444,2.513,2.529,2.62,2.646,2.78,3.043]},{"maxMu":1000000000,"q":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.424,0.424,0.433,0.433,0.442,0.442,0.452,0.455,0.463,0.467,0.468,0.468,0.47,0.478,0.478,0.485,0.486,0.489,0.49,0.494,0.495,0.498,0.5,0.502,0.503,0.511,0.512,0.513,0.516,0.517,0.518,0.518,0.521,0.521,0.524,0.525,0.527,0.527,0.528,0.53,0.533,0.534,0.535,0.539,0.539,0.539,0.54,0.542,0.547,0.55,0.551,0.552,0.552,0.827,0.835,0.837,0.852,0.864,0.867,0.873,0.874,0.879,0.886,0.893,0.898,0.898,0.91,0.922,0.938,0.939,0.942,0.949,0.953,0.956,0.96,0.968,0.975,0.979,0.979,0.98,0.981,0.982,0.982,0.992,0.993,0.999,1.002,1.003,1.008,1.012,1.016,1.019,1.026,1.026,1.028,1.034,1.036,1.036,1.037,1.039,1.043,1.048,1.048,1.054,1.059,1.061,1.07,1.072,1.072,1.074,1.075,1.078,1.08,1.082,1.096,1.098,1.1,1.101,1.102,1.103,1.104,1.105,1.269,1.273,1.287,1.294,1.329,1.352,1.355,1.369,1.373,1.39,1.392,1.407,1.41,1.436,1.439,1.457,1.467,1.477,1.489,1.493,1.498,1.512,1.522,1.529,1.558,1.561,1.57,1.579,1.583,1.589,1.593,1.598,1.602,1.604,1.612,1.616,1.622,1.625,1.627,1.633,1.654,1.678,1.705,1.74,1.766,1.822,1.833,1.842,2.006,2.048,2.048,2.062,2.101,2.103,2.134,2.143,2.154,2.185,2.242,2.249,2.344,2.733]}]}}};
+const PROP_ORDER = ['passYds', 'cmp', 'passTD', 'rushYds', 'rushAtt', 'recYds', 'rec'];
+// a player "has the role" in a game if: pass = 10+ attempts, rush = 3+ carries OR he played QB
+// (so a QB's 0-2 scramble games still count), rec = 1+ target/catch
+const hasRole = (r, role) => role === 'pass' ? r[1] >= 10 : role === 'rush' ? r[5] >= 3 || r[1] >= 10 : r[11] >= 1 || r[8] >= 1;
+let PD = null;
+
+function prepareProps() {
+  const logs = {}, allowed = {};
+  const addGame = (season, week, homeId, awayId, players, pts) => {
+    for (const [tid, oid] of [[homeId, awayId], [awayId, homeId]]) {
+      const tot = new Array(12).fill(0);
+      for (const [pid, r] of Object.entries(players[tid] || {})) {
+        if (!r.some(v => v)) continue;
+        (logs[pid] ??= []).push({ season, week, team: tid, opp: oid, r, teamPts: pts(tid) });
+        r.forEach((v, i) => tot[i] += v);
+      }
+      (allowed[season + ':' + oid] ??= []).push({ week, tot }); // what `oid`'s defense allowed
+    }
+  };
+  const prevAvg = tid => { const t = S.prevTotals?.[tid]; return t && t.gp ? t.ptsFor / t.gp : null; };
+  for (const g of S.prevGames) addGame(S.season - 1, g.week, g.home, g.away, g.players, prevAvg);
+  for (const g of S.games) if (g.final && g.players) addGame(S.season, g.week, g.home.id, g.away.id, g.players, tid => tid === g.home.id ? g.home.score : g.away.score);
+  for (const l of Object.values(logs)) l.sort((a, b) => a.season - b.season || a.week - b.week);
+  PD = { logs, allowed };
+}
+
+function leagueAllowedAvg(season, beforeWeek, idx) {
+  let s = 0, n = 0;
+  for (const [k, list] of Object.entries(PD.allowed)) {
+    if (!k.startsWith(season + ':')) continue;
+    for (const x of list) if (x.week < beforeWeek) { s += x.tot[idx]; n++; }
+  }
+  return n ? s / n : null;
+}
+
+// opponent's allowed-per-game for this stat vs league, shrunk toward league/last season with 4 pseudo-games
+function oppFactor(season, week, opp, idx, k = 4) {
+  const prevLg = leagueAllowedAvg(season - 1, 99, idx);
+  const curLg = leagueAllowedAvg(season, week, idx);
+  const lg = (week <= 3 && prevLg) ? prevLg : (curLg ?? prevLg);
+  const games = (PD.allowed[season + ':' + opp] || []).filter(x => x.week < week);
+  const prev = PD.allowed[(season - 1) + ':' + opp] || [];
+  const prevAvg = prev.length ? prev.reduce((a, b) => a + b.tot[idx], 0) / prev.length : lg;
+  const sum = games.reduce((a, b) => a + b.tot[idx], 0) + k * (0.5 * prevAvg + 0.5 * lg);
+  return (sum / (games.length + k)) / lg;
+}
+
+// points Vegas expects `teamId` to score in game g (total and spread from ESPN odds; homeSpread < 0 = home favored)
+function impliedPts(g, teamId) {
+  const od = g?.odds;
+  if (!od || od.total == null || od.homeSpread == null) return null;
+  return teamId === g.home.id ? od.total / 2 - od.homeSpread / 2 : od.total / 2 + od.homeSpread / 2;
+}
+
+function projectProp(pid, statKey, season, week, opp, g) {
+  const st = PROPS.stats[statKey];
+  const hist = (PD.logs[pid] || []).filter(h => (h.season < season || (h.season === season && h.week < week))
+    && h.season >= season - 1 && hasRole(h.r, st.role)).reverse();
+  if (!hist.some(h => h.season === season) || hist.length < 3) return null;
+  let sw = 0, sx = 0;
+  hist.forEach((h, i) => {
+    const w = Math.pow(st.decay, i) * (h.season < season ? st.lastSeason : 1);
+    sw += w; sx += w * h.r[st.idx];
+  });
+  // quarterbacks get their own baseline for rushing stats
+  const isQB = st.role === 'rush' && hist.some(h => hasRole(h.r, 'pass'));
+  const raw = (sx + st.shrink * PROPS.prior[isQB ? statKey + ':qb' : statKey]) / (sw + st.shrink);
+  let mu = raw * Math.pow(oppFactor(season, week, opp, st.idx), st.alpha);
+  if (st.gamma && g) {
+    const team = hist[0].team, now = impliedPts(g, team);
+    const past = hist.map(h => h.teamPts).filter(x => x != null);
+    if (now != null && past.length) mu *= Math.pow(now / (past.reduce((a, b) => a + b, 0) / past.length), st.gamma);
+  }
+  const bin = st.emp.find(b => mu <= b.maxMu) || st.emp[st.emp.length - 1];
+  // shown projection = average of the fitted distribution (corrects the regression-to-the-mean pull on stars)
+  const meanRatio = bin.q.reduce((a, b) => a + b, 0) / bin.q.length;
+  return { mu, mean: mu * meanRatio, median: mu * bin.q[100], bin, recent: hist.filter(h => h.season === season).slice(0, 5).map(h => h.r[st.idx]) };
+}
+
+// P(stat > line) from the empirical actual/projected distribution
+function propOver(pr, line) {
+  const q = pr.bin.q, t = line / pr.mu;
+  if (t < q[0]) return 1; if (t >= q[200]) return 0;
+  let k = 0; while (k < 200 && q[k + 1] <= t) k++;
+  const frac = q[k + 1] > q[k] ? (t - q[k]) / (q[k + 1] - q[k]) : 0;
+  return 1 - (k + frac) / 200;
+}
+
+// players likely to play: their latest game this season was for this team, in one of its last 2 games
+function activePlayers(teamId, season, week) {
+  const teamWeeks = [...new Set(S.games.filter(g => g.final && g.week < week && (g.home.id === teamId || g.away.id === teamId)).map(g => g.week))].sort((a, b) => b - a).slice(0, 2);
+  return Object.entries(PD.logs).filter(([, l]) => {
+    const cur = l.filter(h => h.season === season && h.week < week);
+    const last = cur[cur.length - 1];
+    return last && last.team === teamId && teamWeeks.includes(last.week);
+  }).map(([pid]) => pid);
+}
+
+const propLines = store.get(`${CACHE_V}:propLines`) || {};
+function savePropLine(key, field, val) {
+  (propLines[key] ??= {})[field] = val;
+  store.set(`${CACHE_V}:propLines`, propLines);
+  renderPropRow(key);
+}
+
+let propRows = {};
+function renderProps() {
+  if (!PD) return;
+  const week = selectedWeek();
+  const wg = S.games.filter(g => g.week === week);
+  const sel = $('propGameSel'), prevVal = sel.value;
+  sel.innerHTML = '<option value="__best">★ Best props this week</option>' +
+    wg.map(g => `<option value="${g.id}">${S.teams[g.away.id].abbr} @ ${S.teams[g.home.id].abbr}</option>`).join('');
+  if (prevVal === '__best' || wg.some(g => g.id === prevVal)) sel.value = prevVal;
+  if (sel.value === '__best') return renderBestProps(wg);
+  const g = wg.find(x => x.id === sel.value);
+  if (!g) { $('propsTbl').innerHTML = ''; return; }
+  const statFilter = $('propStatSel').value;
+  propRows = {};
+  const out = [];
+  for (const [teamId, oppId] of [[g.away.id, g.home.id], [g.home.id, g.away.id]]) {
+    const list = [];
+    for (const pid of activePlayers(teamId, S.season, week)) {
+      for (const sk of PROP_ORDER) {
+        if (statFilter && sk !== statFilter) continue;
+        const pr = projectProp(pid, sk, S.season, week, oppId, g);
+        if (!pr || pr.mu < PROPS.stats[sk].minMu) continue;
+        list.push({ pid, sk, pr });
+      }
+    }
+    list.sort((a, b) => PROP_ORDER.indexOf(a.sk) - PROP_ORDER.indexOf(b.sk) || b.pr.mu - a.pr.mu);
+    if (!list.length) continue;
+    out.push(`<tr><th colspan="12" style="text-align:left;color:var(--text);padding-top:14px"><img src="${S.teams[teamId].logo}" style="width:18px;vertical-align:middle;margin-right:6px">${S.teams[teamId].name} <span class="muted small">vs ${S.teams[oppId].abbr} defense</span></th></tr>`);
+    for (const x of list) {
+      const key = `${g.id}:${x.pid}:${x.sk}`;
+      // 'DNP' when the player isn't in the box score at all (inactive / didn't play)
+      const line = g.final && g.players ? g.players[teamId]?.[x.pid] : undefined;
+      const actual = !g.final || !g.players ? null : line ? line[PROPS.stats[x.sk].idx] : 'DNP';
+      propRows[key] = { ...x, actual, g, teamId };
+      out.push(`<tr id="pr-${key}"></tr>`);
+    }
+  }
+  const head = '<tr><th>Player</th><th>Stat</th><th>Proj</th><th>Median</th><th>Last 5</th><th>Line</th><th>Over</th><th>Under</th><th>Fair O / U</th><th>Book O</th><th>Book U</th><th>Edge</th><th>Rating</th>' + (g.final ? '<th>Actual</th>' : '<th></th>') + '</tr>';
+  $('propsTbl').innerHTML = out.length ? head + out.join('') : '<tr><td class="muted">No players with enough history yet.</td></tr>';
+  for (const key of Object.keys(propRows)) renderPropRow(key);
+  $('propsInfo').innerHTML = (g.final ? 'Final: projections use only games before this week; "Actual" shows what happened. ' : '') +
+    (WX[week]?.ready ? '<span class="dk">Blue lines</span> are DraftKings lines (prices assumed −115). Type your own line or odds to override.' : 'Loading DraftKings lines…');
+}
+
+function renderBestProps(wg) {
+  const all = wg.flatMap(g => propCandidates(g)).filter(x => x.rating).sort((a, b) => b.real - a.real);
+  const rows = all.map(x => {
+    const st = PROPS.stats[x.sk], name = S.names[x.pid] || x.pid, T = S.teams[x.teamId], O = S.teams[x.oppId];
+    const key = `${x.g.id}:prop:${x.pid}:${x.sk}`;
+    let last = '';
+    if (x.g.final) {
+      const l = x.g.players?.[x.teamId]?.[x.pid];
+      last = l ? `<b>${l[st.idx]}</b> ${l[st.idx] === x.line ? 'Push' : (l[st.idx] > x.line) === (x.side === 'over') ? '<span class="pos">Win</span>' : '<span class="neg">Loss</span>'}` : 'DNP';
+    } else last = trackBtn(key, { kind: 'prop', gameId: x.g.id, week: x.g.week, teamId: x.teamId, pid: x.pid, sk: x.sk, side: x.side, line: x.line, odds: PROP_PRICE,
+      label: `${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}` });
+    return `<tr><td>${name}${x.status ? ` <span class="dk small">(${x.status})</span>` : ''}</td><td class="muted">${T.abbr} vs ${O.abbr}</td><td>${st.label}</td>
+      <td class="dk">${x.line}</td><td>${x.pr.mean.toFixed(st.kind === 'count' ? 1 : 0)}</td><td><b>${x.side === 'over' ? 'Over' : 'Under'}</b> ${pct(x.conf)}</td>
+      <td><b>${pct(x.real)}</b></td><td>${fmtMl(x.maxOdds)}</td>
+      <td><span class="tag ${RATING_TAG[x.rating]}" title="${RATING_WHY[x.rating]}">${x.rating}</span></td><td>${last}</td></tr>`;
+  });
+  $('propsTbl').innerHTML = rows.length ? '<tr><th>Player</th><th>Game</th><th>Stat</th><th>DK line</th><th>Proj</th><th>Model</th><th>Realistic</th><th>Bet at or better</th><th>Rating</th><th></th></tr>' + rows.join('')
+    : `<tr><td class="muted">${WX[selectedWeek()]?.ready ? 'No props with an edge this week.' : 'Loading DraftKings lines…'}</td></tr>`;
+  $('propsInfo').innerHTML = 'DraftKings props where the <b>realistic</b> chance (model scaled back by how it did against DK lines) beats a −115 price. ' +
+    'Check the real price in your app: only bet if it is at or better than the "Bet at" odds.';
+}
+
+function renderPropRow(key) {
+  const x = propRows[key]; if (!x) return;
+  const tr = document.getElementById('pr-' + key); if (!tr) return;
+  const st = PROPS.stats[x.sk], saved = propLines[key] || {};
+  const dec = st.kind === 'count' ? 1 : 0;
+  const dkLine = WX[x.g.week]?.games[x.g.id]?.props[x.pid + ':' + x.sk];
+  const usingDk = (saved.line == null || saved.line === '') && dkLine != null;
+  const line = usingDk ? dkLine : parseFloat(saved.line);
+  let over = null;
+  if (isFinite(line)) over = propOver(x.pr, line);
+  const priced = isFinite(line) && (usingDk || saved.bo || saved.bu);
+  const bo = parseFloat(saved.bo || (priced ? PROP_PRICE : NaN)), bu = parseFloat(saved.bu || (priced ? PROP_PRICE : NaN));
+  let edgeHtml = '—';
+  if (over != null && isFinite(bo) && isFinite(bu)) {
+    const io = mlToProb(bo), iu = mlToProb(bu), bookOver = io / (io + iu);
+    const e = over - bookOver, side = e >= 0 ? 'Over' : 'Under', mag = Math.abs(e);
+    edgeHtml = `<span class="${mag >= 0.05 ? 'pos' : 'muted'}">${side} ${(mag * 100).toFixed(1)}%</span>`;
+  }
+  const inp = (field, ph, w, val, cls = '') => `<input type="number" step="0.5" class="${cls}" style="width:${w}px" placeholder="${ph}" value="${val ?? saved[field] ?? ''}" onchange="savePropLine('${key}','${field}',this.value)">`;
+  const conf = over == null ? null : Math.max(over, 1 - over);
+  const side = over != null && over >= 0.5 ? 'over' : 'under';
+  const pe = conf == null ? null : propEdge(x.sk, conf, parseFloat(side === 'over' ? (saved.bo || PROP_PRICE) : (saved.bu || PROP_PRICE)));
+  const roleOut = x.g.final ? [] : roleChange(x.g, x.teamId, x.pid, x.sk);
+  const rating = roleOut.length ? null : pe?.rating;
+  const tKey = `${x.g.id}:prop:${x.pid}:${x.sk}`;
+  const name = S.names[x.pid] || x.pid;
+  const hit = typeof x.actual === 'number' && isFinite(line) ? (x.actual > line ? '<span class="pos">Over</span>' : '<span class="neg">Under</span>') : '';
+  const status = x.g.final ? null : injuryStatus(x.g, x.teamId, x.pid);
+  tr.innerHTML = `<td>${name}${status ? ` <span class="${OUT_RE.test(status) ? 'neg' : 'dk'} small">(${status})</span>` : ''}${roleOut.length ? ` <span class="tag warn" title="${roleOut.join(', ')} out: role may change">ROLE?</span>` : ''}</td><td class="muted">${st.label}</td><td><b>${x.pr.mean.toFixed(dec)}</b></td><td>${x.pr.median.toFixed(dec)}</td>
+    <td class="muted small">${x.pr.recent.join(', ')}</td>
+    <td>${inp('line', (Math.floor(x.pr.median) + 0.5).toFixed(1), 70, usingDk ? dkLine : undefined, usingDk ? 'dk' : '')}</td>
+    <td class="${over != null && over >= 0.5 ? 'pos' : ''}">${over != null ? pct(over) : '—'}</td>
+    <td class="${over != null && over < 0.5 ? 'pos' : ''}">${over != null ? pct(1 - over) : '—'}</td>
+    <td class="muted">${over != null ? fmtMl(probToMl(Math.min(0.99, Math.max(0.01, over)))) + ' / ' + fmtMl(probToMl(Math.min(0.99, Math.max(0.01, 1 - over)))) : '—'}</td>
+    <td>${inp('bo', '-115', 62)}</td><td>${inp('bu', '-115', 62)}</td><td>${edgeHtml}</td>
+    <td>${rating ? `<span class="tag ${RATING_TAG[rating]}" title="Realistic ${pct(pe.real)} · bet at ${fmtMl(pe.maxOdds)} or better">${rating}</span>` : ''}</td>` +
+    (x.actual != null ? `<td><b>${x.actual}</b> ${hit}</td>` : `<td>${isFinite(line) ? trackBtn(tKey, { kind: 'prop', gameId: x.g.id, week: x.g.week, teamId: x.teamId, pid: x.pid, sk: x.sk,
+      side, line, odds: parseFloat(side === 'over' ? bo : bu) || PROP_PRICE, label: `${name} ${side === 'over' ? 'Over' : 'Under'} ${line} ${st.label.toLowerCase()}` }) : ''}</td>`);
+}
+
+// ===================== WEEK EXTRAS: injuries + DraftKings prop lines =====================
+const CORE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events';
+const DK_TYPES = {
+  'Total Passing Yards (incl. overtime)': 'passYds',
+  'Total Pass Completions (incl. overtime)': 'cmp',
+  'Total Passing Touchdowns (incl. overtime)': 'passTD',
+  'Total Carries (incl. overtime)': 'rushAtt',
+  'Total Rushing Yards (incl. overtime)': 'rushYds',
+  'Total Receiving Yards (incl. overtime)': 'recYds',
+  'Total Receptions (incl. overtime)': 'rec',
+};
+const OUT_RE = /out|doubtful|injured reserve|suspen|physically unable|pup/i;
+const PROP_PRICE = -115; // DraftKings' usual prop price; ESPN doesn't provide the actual prices
+const WX = {}; // week -> { games: { gameId: { injuries: { teamId: [..] }, props: { 'pid:stat': line } } } }
+
+function loadWeekExtras(week) {
+  if (WX[week]) return WX[week].loading;
+  const wx = WX[week] = { games: {} };
+  const games = S.games.filter(g => g.week === week);
+  wx.loading = pool(games, 6, async g => {
+    const x = wx.games[g.id] = { injuries: {}, props: {} };
+    if (!g.final) {
+      try {
+        const s = await getJSON(`${API}/summary?event=${g.id}`);
+        for (const t of s.injuries || []) x.injuries[t.team?.id] = (t.injuries || []).map(i => ({
+          pid: i.athlete?.id, name: i.athlete?.displayName, pos: i.athlete?.position?.abbreviation || '', status: i.status || '' }));
+      } catch (e) { console.warn('injuries', g.id, e); }
+    }
+    try {
+      const d = await getJSON(`${CORE}/${g.id}/competitions/${g.id}/odds/100/propBets?limit=1000`);
+      for (const it of d.items || []) {
+        const sk = DK_TYPES[it.type?.name], aid = /athletes\/(\d+)/.exec(it.athlete?.$ref || '')?.[1];
+        const line = it.current?.target?.value;
+        if (sk && aid && line != null && !((aid + ':' + sk) in x.props)) x.props[aid + ':' + sk] = line;
+      }
+    } catch { /* no props posted for this game */ }
+  }, () => {}).then(() => { wx.ready = true; });
+  return wx.loading;
+}
+
+function injuryStatus(g, teamId, pid) {
+  const list = WX[g.week]?.games[g.id]?.injuries[teamId];
+  return list?.find(i => i.pid === pid)?.status || null;
+}
+function injuryLine(g) {
+  if (g.final) return '';
+  const inj = WX[g.week]?.games[g.id]?.injuries;
+  if (!inj) return '';
+  const items = [];
+  for (const t of [g.away.id, g.home.id]) for (const i of inj[t] || [])
+    if (['QB', 'RB', 'WR', 'TE'].includes(i.pos) && /out|doubtful|questionable/i.test(i.status))
+      items.push(`${S.teams[t].abbr} ${i.name} ${i.pos} <b class="${OUT_RE.test(i.status) ? 'neg' : 'dk'}">${i.status}</b>`);
+  return items.length ? `<div class="small muted" style="margin-top:6px">🩹 ${items.join(' · ')}</div>` : '';
+}
+
+// the team's main QB: most pass attempts over its last 3 games before `week`
+function primaryQB(teamId, week) {
+  if (!PD) return null;
+  const teamWeeks = [...new Set(S.games.filter(g => g.final && g.week < week && (g.home.id === teamId || g.away.id === teamId)).map(g => g.week))].sort((a, b) => b - a).slice(0, 3);
+  let best = null, max = 0;
+  for (const [pid, l] of Object.entries(PD.logs)) {
+    const att = l.filter(h => h.season === S.season && h.team === teamId && teamWeeks.includes(h.week)).reduce((a, h) => a + h.r[1], 0);
+    if (att > max) { max = att; best = pid; }
+  }
+  return best;
+}
+
+// ===================== RECOMMENDATIONS =====================
+function marketProb(g) {
+  const od = g.odds;
+  if (!od || od.homeMl == null || od.awayMl == null) return null;
+  const ih = mlToProb(od.homeMl), ia = mlToProb(od.awayMl);
+  return ih / (ih + ia);
+}
+const isThursday = g => new Date(g.date).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' }) === 'Thursday';
+
+// Winner / moneyline call using the rules that held up in backtest/picks.js
+function gameCall(g, p) {
+  const homeFav = p.pHome >= 0.5, conf = Math.max(p.pHome, 1 - p.pHome);
+  const team = homeFav ? g.home.id : g.away.id, odds = homeFav ? g.odds?.homeMl : g.odds?.awayMl;
+  const mk = marketProb(g), agree = mk == null ? null : (mk >= 0.5) === homeFav;
+  let label, why;
+  if (conf < 0.55) { label = 'SKIP'; why = `Toss-up: model only ${pct(conf)} sure.`; }
+  else if (agree === false) { label = 'SKIP'; why = `Model picks the underdog. Those picks won only 43% in testing.`; }
+  else if (isThursday(g)) { label = 'SKIP'; why = `Thursday game: the model's weakest spot (58% vs Vegas 69%).`; }
+  else if (agree == null) { label = 'LEAN'; why = `No Vegas line yet to confirm.`; }
+  else if (conf >= 0.6) { label = 'PICK'; why = `Model and Vegas agree, model ${pct(conf)} sure. These won ~74%.`; }
+  else { label = 'LEAN'; why = `Model and Vegas agree, but only ${pct(conf)} sure. These won ~62%.`; }
+  let bet = null;
+  if (label === 'PICK' && odds != null) {
+    if (g.week <= 5) bet = { ok: false, why: 'No moneyline bet: Weeks 2–5 lost money on moneylines.' };
+    else if (conf < 0.65) bet = { ok: true, why: `Moneyline bet at ${fmtMl(odds)}: 60–65% picks made +2–4% in testing.` };
+    else bet = { ok: false, why: `No moneyline bet at ${fmtMl(odds)}: big favorites win but cost too much (lost 6–8%).` };
+  }
+  return { label, why, team, conf, odds, bet };
+}
+
+// Props vs DraftKings lines. Against 2026 weeks 2-5 lines (backtest/prop_lines_test.js) the model was overconfident
+// when it disagreed with DK: 80%+ picks hit ~67%, 70-80% hit ~58%, 55-70% ~54%. So the model % is scaled back toward
+// 50% ("realistic %") by how much each stat's picks actually held up; receiving/passing yards didn't beat DK at all.
+const PROP_TRUST = { rec: 0.45, rushYds: 0.45, rushAtt: 0.45, cmp: 0.45, passTD: 0.3, recYds: 0.1, passYds: 0.1 };
+function propEdge(sk, conf, odds = PROP_PRICE) {
+  const real = 0.5 + (PROP_TRUST[sk] ?? 0) * (conf - 0.5);
+  const edge = real - mlToProb(odds); // vs the break-even rate at these odds
+  const rating = edge >= 0.045 ? 'STRONG' : edge >= 0.015 ? 'LEAN' : null;
+  return { real, edge, rating, maxOdds: probToMl(real - 0.015) }; // worst price that still leaves a small edge
+}
+// Teammates whose absence changes this player's role (the model doesn't know; DraftKings' line does):
+// an Out/Doubtful teammate at a related position who had real usage over his last 3 games.
+const ROLE_POS = { pass: ['QB'], rush: ['RB', 'QB'], rec: ['WR', 'TE', 'RB'] };
+function roleChange(g, teamId, pid, sk) {
+  const role = PROPS.stats[sk].role, out = [];
+  for (const i of WX[g.week]?.games[g.id]?.injuries[teamId] || []) {
+    if (i.pid === pid || !OUT_RE.test(i.status) || !ROLE_POS[role].includes(i.pos)) continue;
+    const recent = (PD.logs[i.pid] || []).filter(h => h.season === S.season && h.week < g.week).slice(-3);
+    if (!recent.length) continue;
+    const avg = idx => recent.reduce((a, h) => a + h.r[idx], 0) / recent.length;
+    const used = role === 'pass' ? avg(1) >= 10 : role === 'rush' ? avg(5) >= 6 : avg(11) >= 3;
+    if (used) out.push(i.name);
+  }
+  return out;
+}
+
+function playerTeam(pid, week) {
+  const l = PD.logs[pid] || [];
+  const cur = l.filter(h => h.season === S.season && h.week < week);
+  return cur.length ? cur[cur.length - 1].team : null;
+}
+function propCandidates(g) {
+  const lines = WX[g.week]?.games[g.id]?.props || {};
+  const out = [];
+  for (const [k, line] of Object.entries(lines)) {
+    const [pid, sk] = k.split(':');
+    const teamId = playerTeam(pid, g.week);
+    if (teamId !== g.home.id && teamId !== g.away.id) continue;
+    const oppId = teamId === g.home.id ? g.away.id : g.home.id;
+    const status = injuryStatus(g, teamId, pid);
+    if (status && OUT_RE.test(status)) continue;
+    const pr = projectProp(pid, sk, S.season, g.week, oppId, g);
+    if (!pr) continue;
+    const over = propOver(pr, line), side = over >= 0.5 ? 'over' : 'under', conf = Math.max(over, 1 - over);
+    const e = propEdge(sk, conf);
+    const roleOut = roleChange(g, teamId, pid, sk);
+    if (roleOut.length) e.rating = null; // usage likely shifts; skip
+    out.push({ g, teamId, oppId, pid, sk, pr, line, over, side, conf, ...e, status, roleOut });
+  }
+  return out.sort((a, b) => b.conf - a.conf);
+}
+const RATING_TAG = { STRONG: 'pick', LEAN: 'lean' };
+const RATING_WHY = { STRONG: 'Realistic chance beats the −115 break-even by 4.5+ points', LEAN: 'Realistic chance beats the −115 break-even by 1.5–4.5 points' };
+
+// ===================== SYSTEMS (backtest/linemaker_seasons.js, systems_qbwr.js) =====================
+// "Easy" alt props that hit at high rates 2021-26. They only pay if the price is better than `maxOdds`.
+const SYSTEMS = {
+  rb30: { name: 'RB 30+ rushing yards', maxOdds: -600, record: '89.8% over 342 bets (2021–26); profitable 5 of 6 seasons at −600', origin: "LINEMAKER's System 1" },
+  qbtd: { name: 'QB 1+ passing TD', maxOdds: -450, record: '86.6% over 831 bets (2021–26); worst season 81%', origin: 'our model 85%+ (uses Vegas team total)' },
+  wr3: { name: 'WR/TE 3+ receptions', maxOdds: -800, record: '92.4% over 578 bets (2021–26); worst season 89%', origin: 'our model 85%+ and 85%+ history' },
+};
+const isRBLog = h => h.r[5] >= 3 && h.r[1] < 10, isRecLog = h => (h.r[11] >= 1 || h.r[8] >= 1) && h.r[5] < 3 && h.r[1] < 10;
+function systemBets(week) {
+  const out = [];
+  for (const g of S.games.filter(x => x.week === week)) {
+    for (const [teamId, oppId] of [[g.away.id, g.home.id], [g.home.id, g.away.id]]) {
+      const out_ = pid => { const st = injuryStatus(g, teamId, pid); return st && OUT_RE.test(st) ? st : null; };
+      const hist = (pid, f) => (PD.logs[pid] || []).filter(h => (h.season === S.season && h.week < week || h.season === S.season - 1) && f(h));
+      const actual = (pid, idx) => g.final && g.players ? (g.players[teamId]?.[pid] ? g.players[teamId][pid][idx] : 'DNP') : null;
+      // QB 1+ TD: our model 85%+
+      const qb = primaryQB(teamId, week);
+      if (qb && !out_(qb)) {
+        const pr = projectProp(qb, 'passTD', S.season, week, oppId, g);
+        const p = pr ? propOver(pr, 0.5) : 0;
+        if (p >= 0.85) out.push({ sys: 'qbtd', g, teamId, oppId, pid: qb, sk: 'passTD', line: 0.5, model: p, actual: actual(qb, 3), status: injuryStatus(g, teamId, qb) });
+      }
+      for (const pid of activePlayers(teamId, S.season, week)) {
+        if (out_(pid)) continue;
+        // RB 30+ rushing (his rules): 14+ carries/game, opponent allows 4.0+ yds/carry, 30+ in 90%+ of last two seasons
+        const rb = hist(pid, isRBLog), cur = rb.filter(h => h.season === S.season);
+        if (cur.length >= 3 && rb.length >= 6 && cur.reduce((a, h) => a + h.r[5], 0) / cur.length >= 14) {
+          const d = (PD.allowed[S.season + ':' + oppId] || []).filter(x => x.week < week);
+          const ypc = d.length >= 3 ? d.reduce((a, x) => a + x.tot[6], 0) / d.reduce((a, x) => a + x.tot[5], 0) : 0;
+          const rate = rb.filter(h => h.r[6] >= 30).length / rb.length;
+          if (ypc >= 4.0 && rate >= 0.9) {
+            const pr = projectProp(pid, 'rushYds', S.season, week, oppId, g);
+            out.push({ sys: 'rb30', g, teamId, oppId, pid, sk: 'rushYds', line: 29.5, model: pr ? propOver(pr, 29.5) : null, hist: rate, ypc, actual: actual(pid, 6), status: injuryStatus(g, teamId, pid) });
+          }
+        }
+        // WR/TE 3+ receptions: model 85%+ and 3+ in 85%+ of the last two seasons
+        const wr = hist(pid, isRecLog);
+        if (wr.length >= 6 && wr.some(h => h.season === S.season)) {
+          const rate = wr.filter(h => h.r[8] >= 3).length / wr.length;
+          const pr = rate >= 0.85 ? projectProp(pid, 'rec', S.season, week, oppId, g) : null;
+          const p = pr ? propOver(pr, 2.5) : 0;
+          if (p >= 0.85) out.push({ sys: 'wr3', g, teamId, oppId, pid, sk: 'rec', line: 2.5, model: p, hist: rate, actual: actual(pid, 8), status: injuryStatus(g, teamId, pid) });
+        }
+      }
+    }
+  }
+  return out.sort((a, b) => Object.keys(SYSTEMS).indexOf(a.sys) - Object.keys(SYSTEMS).indexOf(b.sys) || (b.model || 0) - (a.model || 0));
+}
+function systemCardsHtml(week, only) {
+  const bets = systemBets(week);
+  const rows = Object.entries(SYSTEMS).filter(([k]) => !only || only.includes(k)).map(([k, sy]) => {
+    const list = bets.filter(b => b.sys === k);
+    const items = list.map(b => {
+      const name = S.names[b.pid] || b.pid, T = S.teams[b.teamId], O = S.teams[b.oppId];
+      const what = k === 'qbtd' ? '1+ passing TD' : k === 'rb30' ? '30+ rushing yards' : '3+ receptions';
+      const key = `${b.g.id}:sys:${k}:${b.pid}`;
+      const res = b.actual == null ? trackBtn(key, { kind: 'prop', gameId: b.g.id, week, teamId: b.teamId, pid: b.pid, sk: b.sk, side: 'over', line: b.line, odds: sy.maxOdds, label: `${name} ${what} (system)` })
+        : b.actual === 'DNP' ? '<span class="muted">DNP</span>' : (b.actual > b.line ? `<span class="pos">✓ ${b.actual}</span>` : `<span class="neg">✗ ${b.actual}</span>`);
+      return `<div class="call"><span class="tag pick">${T.abbr}</span>
+        <div><b>${name} ${what}</b> <span class="muted small">vs ${O.abbr}</span>${b.status ? ` <span class="dk small">(${b.status})</span>` : ''}
+        <div class="why">${b.model != null ? `Model ${pct(b.model)}` : ''}${b.hist != null ? ` · hit it in ${pct(b.hist)} of last 2 seasons` : ''}${b.ypc ? ` · ${O.abbr} allows ${b.ypc.toFixed(1)} yds/carry` : ''}</div></div>${res}</div>`;
+    }).join('');
+    return `<div class="card"><div class="ghead"><span><b style="color:var(--text);font-size:14px">${sy.name}</b> · ${sy.origin}</span><span class="pill">${list.length} bet${list.length === 1 ? '' : 's'}</span></div>
+      <div class="why" style="margin-bottom:6px">Hit ${sy.record}. <b>Only bet at ${fmtMl(sy.maxOdds)} or better</b>; at worse prices it loses money.</div>
+      ${items || '<div class="muted small">Nobody qualifies this week.</div>'}</div>`;
+  });
+  return rows.join('');
+}
+
+// ===================== POSITION TABS =====================
+// A player's position from his box score history: QB if he's thrown 10+ passes in a game, RB if he has
+// more carries than targets, otherwise WR/TE.
+function playerPos(pid, week) {
+  const l = (PD.logs[pid] || []).filter(h => h.season === S.season && h.week < week || h.season === S.season - 1);
+  if (l.some(h => h.r[1] >= 10)) return 'QB';
+  // more carries than targets = running back (keeps gadget WRs like Deebo Samuel at WR, backup RBs at RB)
+  return l.reduce((a, h) => a + h.r[5], 0) > l.reduce((a, h) => a + h.r[11], 0) ? 'RB' : 'WR';
+}
+const POS_SYSTEM = { QB: 'qbtd', RB: 'rb30', WR: 'wr3' };
+const POS_NAME = { QB: 'Quarterbacks', RB: 'Running backs', WR: 'Wide receivers & tight ends' };
+function renderPosition(pos) {
+  if (!PD || !curWeek) return;
+  const week = selectedWeek(), wx = WX[week];
+  $('posSystems').innerHTML = systemCardsHtml(week, [POS_SYSTEM[pos]]);
+  const games = S.games.filter(g => g.week === week);
+  const all = wx?.ready ? games.flatMap(g => propCandidates(g)).filter(x => playerPos(x.pid, week) === pos) : [];
+  const list = (posShowAll ? all : all.filter(x => x.rating)).sort((a, b) => (b.rating ? 1 : 0) - (a.rating ? 1 : 0) || b.real - a.real);
+  const rows = list.map(x => {
+    const st = PROPS.stats[x.sk], name = S.names[x.pid] || x.pid, T = S.teams[x.teamId], O = S.teams[x.oppId];
+    const key = `${x.g.id}:prop:${x.pid}:${x.sk}`;
+    let last;
+    if (x.g.final) {
+      const l = x.g.players?.[x.teamId]?.[x.pid];
+      last = l ? `<b>${l[st.idx]}</b> ${l[st.idx] === x.line ? 'Push' : (l[st.idx] > x.line) === (x.side === 'over') ? '<span class="pos">Win</span>' : '<span class="neg">Loss</span>'}` : 'DNP';
+    } else last = x.rating ? trackBtn(key, { kind: 'prop', gameId: x.g.id, week, teamId: x.teamId, pid: x.pid, sk: x.sk, side: x.side, line: x.line, odds: PROP_PRICE,
+      label: `${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}` }) : '';
+    return `<tr><td>${name} <span class="muted small">${T.abbr} vs ${O.abbr}</span>${x.status ? ` <span class="dk small">(${x.status})</span>` : ''}${x.roleOut?.length ? ' <span class="tag warn" title="Teammate out: role may change">ROLE?</span>' : ''}</td>
+      <td><b>${x.side === 'over' ? 'Over' : 'Under'} ${x.line}</b> <span class="muted">${st.label.toLowerCase()}</span></td>
+      <td>${x.pr.mean.toFixed(st.kind === 'count' ? 1 : 0)}</td><td>${pct(x.conf)}</td><td><b>${pct(x.real)}</b></td><td>${x.rating ? fmtMl(x.maxOdds) : '—'}</td>
+      <td>${x.rating ? `<span class="tag ${RATING_TAG[x.rating]}">${x.rating}</span>` : ''}</td><td>${last}</td></tr>`;
+  });
+  $('posProps').innerHTML = !wx?.ready ? '<tr><td class="muted">Loading DraftKings lines…</td></tr>'
+    : rows.length ? '<tr><th>Player</th><th>Prop (DraftKings)</th><th>Proj</th><th>Model</th><th>Realistic</th><th>Bet at</th><th>Rating</th><th></th></tr>' + rows.join('')
+    : `<tr><td class="muted">${all.length ? 'No props with an edge this week. Tap "Show all props" to see every line.' : 'No DraftKings props posted for this week yet.'}</td></tr>`;
+  $('posAllBtn').textContent = posShowAll ? 'Show best only' : `Show all props (${all.length})`;
+  $('posInfo').innerHTML = `<b>${POS_NAME[pos]}</b> · Week ${week}` + (week <= 5 ? ' · <span class="dk">early season: the model is least reliable</span>' : '');
+}
+
+// ===================== THIS WEEK CARD =====================
+function renderWeek() {
+  const week = selectedWeek();
+  const games = S.games.filter(g => g.week === week);
+  const hfa = parseFloat($('hfaIn').value) || 0, qbPen = parseFloat($('qbIn').value) || 0, sd = parseFloat($('sdIn').value) || 13.5;
+  const backup = backupSet(games);
+  const wx = WX[week];
+  const counts = { PICK: 0, LEAN: 0, SKIP: 0 }; let props = 0, right = 0, done = 0;
+  const cards = games.map(g => {
+    const p = predict(P, g, hfa, sd, qbPen, backup);
+    if (!p) return '';
+    const H = S.teams[g.home.id], A = S.teams[g.away.id];
+    const c = gameCall(g, p); counts[c.label]++;
+    if (g.final && c.label !== 'SKIP') { done++; if ((g.home.score > g.away.score) === (c.team === g.home.id)) right++; }
+    const T = S.teams[c.team], d = new Date(g.date);
+    const mlKey = `${g.id}:ml:${c.team}`;
+    const rows = [`<div class="call"><span class="tag ${c.label.toLowerCase()}">${c.label}</span>
+      <div><b>${c.label === 'SKIP' ? 'No pick' : T.name + ' to win'}</b><div class="why">${c.why}</div></div>
+      ${c.label !== 'SKIP' && c.odds != null && !g.final ? trackBtn(mlKey, { kind: 'ml', gameId: g.id, week, teamId: c.team, odds: c.odds, label: `${T.abbr} moneyline (${A.abbr} @ ${H.abbr})` }) : ''}</div>`];
+    if (c.bet) rows.push(`<div class="call"><span class="tag ${c.bet.ok ? 'pick' : 'skip'}">${c.bet.ok ? 'BET' : 'NO BET'}</span><div class="why">${c.bet.why}</div><span></span></div>`);
+    rows.push(`<div class="call"><span class="tag skip">SKIP</span><div class="why">Spread & total: no reliable edge in testing.</div><span></span></div>`);
+    for (const t of [g.away.id, g.home.id]) {
+      const key = g.id + ':' + t;
+      if (backup.has(key)) {
+        const auto = autoBackup(g, t);
+        rows.push(`<div class="call"><span class="tag warn">QB</span><div class="why">${S.teams[t].abbr} backup QB${auto ? `: ${S.names[auto.qb] || 'starter'} is ${auto.status}` : ' (marked by you)'}. −${qbPen} pts applied.</div><span></span></div>`);
+      }
+    }
+    if (wx?.ready) {
+      const best = propCandidates(g).filter(x => x.rating === 'STRONG' || x.rating === 'LEAN').slice(0, 3);
+      props += best.length;
+      for (const x of best) rows.push(propCallRow(x));
+    }
+    const res = g.final ? ` · Final ${A.abbr} ${g.away.score}–${g.home.score} ${H.abbr}` : '';
+    return `<div class="card ${c.label === 'PICK' ? 'value' : ''}">
+      <div class="ghead"><span>${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${g.neutral ? ' · Neutral' : ''}${res}</span>
+        <span>${g.odds?.homeSpread != null ? `Vegas: ${g.odds.homeSpread <= 0 ? H.abbr + ' ' + g.odds.homeSpread : A.abbr + ' ' + (-g.odds.homeSpread)}` : ''}</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><img src="${A.logo}" width="24"> <b>${A.abbr} ${f1(p.aPts)}</b> <span class="muted">@</span> <b>${H.abbr} ${f1(p.hPts)}</b> <img src="${H.logo}" width="24"></div>
+      ${rows.join('')}
+      ${injuryLine(g)}
+    </div>`;
+  });
+  $('weekCards').innerHTML = cards.join('');
+  $('weekCardInfo').innerHTML = `Week ${week}: <b>${counts.PICK}</b> picks, <b>${counts.LEAN}</b> leans, <b>${counts.SKIP}</b> skips` +
+    (wx?.ready ? ` · <b>${props}</b> props worth a look` : ' · loading injuries & DraftKings props…') +
+    (done ? ` · picks & leans went <b>${right}-${done - right}</b>` : '') +
+    (week <= 5 ? ' · <span class="dk">Weeks 2–5 are the model\'s least reliable stretch.</span>' : '');
+}
+
+function propCallRow(x) {
+  const st = PROPS.stats[x.sk], name = S.names[x.pid] || x.pid;
+  const key = `${x.g.id}:prop:${x.pid}:${x.sk}`;
+  return `<div class="call"><span class="tag ${RATING_TAG[x.rating]}">${x.rating}</span>
+    <div><b>${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}</b>${x.status ? ` <span class="dk small">(${x.status})</span>` : ''}
+      <div class="why">Model ${pct(x.conf)} → realistic ~${pct(x.real)} · projects ${x.pr.mean.toFixed(st.kind === 'count' ? 1 : 0)} · <b>bet only at ${fmtMl(x.maxOdds)} or better</b></div></div>
+    ${x.g.final ? '' : trackBtn(key, { kind: 'prop', gameId: x.g.id, week: x.g.week, teamId: x.teamId, pid: x.pid, sk: x.sk, side: x.side, line: x.line, odds: PROP_PRICE,
+      label: `${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}` })}</div>`;
+}
+
+// ===================== TRACKER =====================
+let tracker = store.get(`${CACHE_V}:tracker`) || [];
+const saveTracker = () => store.set(`${CACHE_V}:tracker`, tracker);
+const pendingTrack = {};
+function trackBtn(key, data) {
+  const on = tracker.some(t => t.key === key);
+  pendingTrack[key] = data;
+  return `<button class="btn sm ${on ? 'done' : ''}" onclick="toggleTrack('${key}')">${on ? '✓ Tracked' : '+ Track'}</button>`;
+}
+function toggleTrack(key) {
+  const i = tracker.findIndex(t => t.key === key);
+  if (i >= 0) tracker.splice(i, 1);
+  else tracker.push({ ...pendingTrack[key], key, season: S.season, stake: parseFloat($('stakeIn').value) || 10, ts: Date.now() });
+  saveTracker(); renderWeek(); if (!$('tab-props').classList.contains('hidden')) renderProps();
+}
+function gradePick(t) {
+  const g = S.games.find(x => x.id === t.gameId);
+  if (!g || !g.final) return { res: 'Pending' };
+  if (t.kind === 'ml') {
+    const mine = t.teamId === g.home.id ? g.home.score : g.away.score, theirs = t.teamId === g.home.id ? g.away.score : g.home.score;
+    return { res: mine > theirs ? 'Win' : mine < theirs ? 'Loss' : 'Push' };
+  }
+  const line = g.players?.[t.teamId]?.[t.pid];
+  if (!line) return { res: g.players ? 'Void' : 'Pending' }; // player didn't play
+  const x = line[PROPS.stats[t.sk].idx];
+  return { res: x === t.line ? 'Push' : ((x > t.line) === (t.side === 'over') ? 'Win' : 'Loss'), actual: x };
+}
+const profitOf = (t, res) => res === 'Win' ? t.stake * mlProfit(t.odds) / 100 : res === 'Loss' ? -t.stake : 0;
+function editTrack(i, field, val) { const v = parseFloat(val); if (isFinite(v)) { tracker[i][field] = v; saveTracker(); renderTracker(); } }
+function removeTrack(i) { tracker.splice(i, 1); saveTracker(); renderTracker(); renderWeek(); }
+function renderTracker() {
+  const graded = tracker.map((t, i) => ({ t, i, ...gradePick(t) }));
+  const sum = list => {
+    const w = list.filter(x => x.res === 'Win').length, l = list.filter(x => x.res === 'Loss').length, p = list.filter(x => x.res === 'Push').length;
+    const staked = list.filter(x => x.res === 'Win' || x.res === 'Loss').reduce((a, x) => a + x.t.stake, 0);
+    const profit = list.reduce((a, x) => a + profitOf(x.t, x.res), 0);
+    return { w, l, p, staked, profit };
+  };
+  const all = sum(graded), ml = sum(graded.filter(x => x.t.kind === 'ml')), pr = sum(graded.filter(x => x.t.kind === 'prop'));
+  const money = v => (v < 0 ? '−$' : '$') + Math.abs(v).toFixed(2);
+  const tile = (l, v, cls = '') => `<div class="stat"><span class="muted small">${l}</span><b class="${cls}">${v}</b></div>`;
+  $('trackStats').innerHTML = tile('Record', `${all.w}-${all.l}${all.p ? '-' + all.p : ''}`) +
+    tile('Win %', all.w + all.l ? pct(all.w / (all.w + all.l)) : '—') +
+    tile('Profit', money(all.profit), all.profit >= 0 ? 'pos' : 'neg') +
+    tile('ROI', all.staked ? pct(all.profit / all.staked) : '—', all.profit >= 0 ? 'pos' : 'neg') +
+    tile('Moneylines', `${ml.w}-${ml.l} · ${money(ml.profit)}`) + tile('Props', `${pr.w}-${pr.l} · ${money(pr.profit)}`) +
+    tile('Pending', graded.filter(x => x.res === 'Pending').length);
+  const rows = graded.slice().sort((a, b) => b.t.week - a.t.week || b.t.ts - a.t.ts).map(({ t, i, res, actual }) => `<tr>
+    <td>Wk ${t.week}</td><td>${t.label}</td>
+    <td><input type="number" style="width:70px" value="${t.odds}" onchange="editTrack(${i},'odds',this.value)"></td>
+    <td><input type="number" style="width:60px" value="${t.stake}" onchange="editTrack(${i},'stake',this.value)"></td>
+    <td class="${res === 'Win' ? 'pos' : res === 'Loss' ? 'neg' : 'muted'}">${res}${actual != null ? ` (${actual})` : ''}</td>
+    <td class="${profitOf(t, res) > 0 ? 'pos' : profitOf(t, res) < 0 ? 'neg' : 'muted'}">${res === 'Pending' ? '—' : money(profitOf(t, res))}</td>
+    <td><button class="btn sm" onclick="removeTrack(${i})">✕</button></td></tr>`);
+  $('trackTbl').innerHTML = rows.length ? '<tr><th>Week</th><th>Pick</th><th>Odds</th><th>Bet $</th><th>Result</th><th>Profit</th><th></th></tr>' + rows.join('')
+    : '<tr><td class="muted">No picks tracked yet. Use the + Track buttons on This Week or Player Props.</td></tr>';
+}
+
+function renderAll() {
+  renderGames(); renderWeek(); renderProps();
+  if (curTab.startsWith('pos-')) renderPosition(curTab.slice(4));
+  if (!$('tab-tracker').classList.contains('hidden')) renderTracker();
+}
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+(async function init() {
+  try {
+    S = await loadAll();
+    const weeks = [...new Set(S.games.map(g => g.week))].filter(w => w >= 2).sort((a, b) => a - b);
+    curWeek = S.nextWeek;
+    $('weekTabs').innerHTML = weeks.map(w => `<button data-week="${w}" class="${w === S.nextWeek ? 'active now' : ''}" title="${w === S.nextWeek ? 'This week' : ''}">Wk ${w}</button>`).join('');
+    $('weekTabs').querySelectorAll('button').forEach(b => b.onclick = () => setWeek(+b.dataset.week));
+    $('posAllBtn').onclick = () => { posShowAll = !posShowAll; renderPosition(curTab.slice(4)); };
+    prepareProps();
+    for (const id of ['prevIn', 'qbIn', 'hfaIn', 'sdIn', 'valueOnly']) $(id).onchange = renderAll;
+    $('stakeIn').value = store.get(`${CACHE_V}:stake`) || 10;
+    $('stakeIn').onchange = () => store.set(`${CACHE_V}:stake`, parseFloat($('stakeIn').value) || 10);
+    $('clearGraded').onclick = () => { tracker = tracker.filter(t => gradePick(t).res === 'Pending'); saveTracker(); renderTracker(); renderWeek(); };
+    renderGames();
+    $('propStatSel').innerHTML += PROP_ORDER.map(k => `<option value="${k}">${PROPS.stats[k].label}</option>`).join('');
+    $('propGameSel').onchange = renderProps; $('propStatSel').onchange = renderProps;
+    renderAll();
+    loadWeekExtras(selectedWeek()).then(renderAll);
+    // remove caches from older versions of the app
+    try { Object.keys(localStorage).filter(k => /^nflp\d+:/.test(k) && !k.startsWith(CACHE_V + ':')).forEach(k => localStorage.removeItem(k)); } catch {}
+    $('loading').classList.add('hidden');
+    let startTab = 'week'; try { startTab = localStorage.getItem(`${CACHE_V}:tab`) || 'week'; } catch {}
+    showTab(document.querySelector(`#secTabs button[data-tab="${startTab}"]`) ? startTab : 'week');
+    document.querySelector('#weekTabs button.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  } catch (err) {
+    $('loadmsg').innerHTML = `<span class="neg">Couldn't reach ESPN (${err.message}). Check your internet connection.</span> <button class="btn sm" onclick="location.reload()">Retry</button>`;
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

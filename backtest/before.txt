@@ -1,0 +1,4 @@
+=== Rush attempts ===  params {"decay":0.8,"lastSeason":1,"shrink":3,"alpha":0,"beta":0}  var=0.268*mu^1.93 dud=5%  dist=empirical (train logloss formula 0.6646 vs empirical 0.6204)
+  TEST 24-25 model       n=12040  MAE   3.68  Brier 0.2142  LogLoss 0.6157  over-at-avg 42.6%
+=== Rushing yards ===  params {"decay":0.8,"lastSeason":0.5,"shrink":3,"alpha":0.5,"beta":0}  var=1.825*mu^1.63 dud=0%  dist=empirical (train logloss formula 0.6114 vs empirical 0.5982)
+  TEST 24-25 model       n=11790  MAE  23.20  Brier 0.2101  LogLoss 0.6089  over-at-avg 43.6%
