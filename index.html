@@ -118,6 +118,8 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.6)}
 .pcresult.thin{border-color:var(--warn);background:rgba(245,158,11,.12)}
 .pcresult.bad{border-color:var(--bad);background:rgba(239,68,68,.12)}
 .chk{cursor:pointer}
+.lc .nv{grid-column:1/3;font-size:11px;font-weight:700}
+.nvtag{font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;background:rgba(59,130,246,.18);color:#93c5fd;white-space:nowrap}
 .lnrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
 .lnrow input{width:90px;font-size:18px;padding:8px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px}
 .btn.sm.chkbtn{margin-left:4px}
@@ -152,7 +154,7 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.6)}
 </head>
 <body>
 <header>
-  <div class="toprow"><h1>🏆 Sports <span>Predictor</span></h1><select id="weekSel" title="Week"></select></div>
+  <div class="toprow"><h1>🏆 Sports <span>Predictor</span></h1><span><select id="weekSel" title="Week"></select> <button class="btn sm" id="settingsBtn" title="Settings" onclick="openSettings()">⚙</button></span></div>
   <nav id="sportTabs" class="chips" aria-label="Sport">
     <button data-sport="NFL" class="active">🏈 NFL</button>
     <button data-sport="NBA">🏀 NBA</button>
@@ -172,6 +174,22 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.6)}
     <div id="loadmsg">Loading…</div>
     <div class="prog"><i id="progbar"></i></div>
   </div>
+
+  <dialog id="settingsDlg" class="sheet" aria-label="Settings">
+    <div class="dlghead"><b>Settings</b><button class="btn sm" onclick="$('settingsDlg').close()" aria-label="Close">✕</button></div>
+    <div class="pcinput">Novig prices (through OddsPapi)</div>
+    <div class="muted small" style="margin:4px 0 8px">Paste your OddsPapi API key. It's saved only on this device. It's never sent anywhere except OddsPapi and is never part of the app's code.
+      Free keys: <a href="https://oddspapi.io" target="_blank" rel="noopener">oddspapi.io</a> (250 requests a month; the app uses about 1 per refresh).</div>
+    <input id="opKeyIn" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your OddsPapi API key" style="width:100%;font-size:16px;padding:10px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px">
+    <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="useNovig"> Use Novig's players, lines and prices instead of DraftKings</label>
+    <div class="bar" style="margin-top:10px">
+      <button class="btn sm" onclick="saveOpKey()">Save</button>
+      <button class="btn sm" onclick="testOpKey()">Test</button>
+      <button class="btn sm" onclick="refreshNovig()">↻ Refresh Novig</button>
+      <button class="btn sm" onclick="forgetOpKey()">Remove key</button>
+    </div>
+    <div id="opStatus" class="pcresult">No key saved yet.</div>
+  </dialog>
 
   <dialog id="priceCheck" class="sheet" aria-label="Price check">
     <div class="dlghead"><b id="pcTitle">Price check</b><button class="btn sm" onclick="$('priceCheck').close()" aria-label="Close">✕</button></div>
@@ -1204,6 +1222,8 @@ function playerTeam(pid, week) {
   return cur.length ? cur[cur.length - 1].team : null;
 }
 function propCandidates(g) {
+  const nv = novigFor(g);
+  if (nv) return novigCandidates(g, nv);
   const lines = WX[g.week]?.games[g.id]?.props || {};
   const out = [];
   for (const [k, line] of Object.entries(lines)) {
@@ -1224,6 +1244,37 @@ function propCandidates(g) {
     out.push({ g, teamId, oppId, pid, sk, pr, line, over, side, conf, ...e, status, roleOut });
   }
   return out.sort((a, b) => b.conf - a.conf);
+}
+// Novig version: Novig's own players, lines and real prices; for each player/stat keep the side and line with the best edge
+function novigCandidates(g, nv) {
+  const out = [];
+  for (const [k, offers] of Object.entries(nv.props)) {
+    const [pid, sk] = k.split(':');
+    if (hiddenPlayers.has(pid)) continue;
+    const teamId = playerTeam(pid, g.week);
+    if (teamId !== g.home.id && teamId !== g.away.id) continue;
+    const oppId = teamId === g.home.id ? g.away.id : g.home.id;
+    const status = injuryStatus(g, teamId, pid);
+    if (status && OUT_RE.test(status)) continue;
+    const pr = projectProp(pid, sk, S.season, g.week, oppId, g);
+    if (!pr) continue;
+    let best = null;
+    for (const o of offers) {
+      const over = propOver(pr, o.line), conf = o.side === 'over' ? over : 1 - over;
+      // The market's own chance for this side: no-vig from both sides when Novig prices both, else the price itself.
+      // The realistic % moves from the market's chance toward our model by the stat's trust factor (anchoring at
+      // 50% only made sense for DraftKings lines assumed at -115 on both sides).
+      const opp = offers.find(x => x.line === o.line && x.side !== o.side);
+      const mkt = opp ? (1 / o.price) / (1 / o.price + 1 / opp.price) : 1 / o.price;
+      const real = mkt + (PROP_TRUST[sk] ?? 0) * (conf - mkt), edge = real - 1 / o.price;
+      const e = { real, edge, rating: edge >= 0.045 ? 'STRONG' : edge >= 0.015 ? 'LEAN' : null, maxOdds: probToMl(Math.max(0.01, real - 0.015)), mkt };
+      if (!best || e.edge > best.edge) best = { line: o.line, side: o.side, over, conf, price: o.price, ...e };
+    }
+    const roleOut = roleChange(g, teamId, pid, sk);
+    if (roleOut.length) best.rating = null;
+    out.push({ g, teamId, oppId, pid, sk, pr, ...best, status, roleOut, book: 'Novig' });
+  }
+  return out.sort((a, b) => b.edge - a.edge);
 }
 const RATING_TAG = { STRONG: 'pick', LEAN: 'lean' };
 const RATING_WHY = { STRONG: 'Realistic chance beats the −115 break-even by 4.5+ points', LEAN: 'Realistic chance beats the −115 break-even by 1.5–4.5 points' };
@@ -1286,11 +1337,12 @@ function systemCardsHtml(week, only) {
       const key = `${b.g.id}:sys:${k}:${b.pid}`;
       const res = b.actual == null ? trackBtn(key, { kind: 'prop', gameId: b.g.id, week, teamId: b.teamId, pid: b.pid, sk: b.sk, side: 'over', line: b.line, odds: sy.maxOdds, label: `${name} ${what} (system)` })
         : b.actual === 'DNP' ? '<span class="muted">DNP</span>' : (b.actual > b.line ? `<span class="pos">✓ ${b.actual}</span>` : `<span class="neg">✗ ${b.actual}</span>`);
-      const chk = b.actual == null ? `<button class="btn sm chkbtn" onclick="${pc(key, { title: `${name} ${what}`, trueP: sy.hit, pid: b.pid, trueLabel: `System's tested win rate`, trueShort: 'system win rate',
+      const nvp = b.actual == null ? novigPrice(b.g, b.pid, b.sk, b.line, 'over') : null;
+      const chk = b.actual == null ? `<button class="btn sm chkbtn" onclick="${pc(key, { title: `${name} ${what}`, trueP: sy.hit, pid: b.pid, novig: nvp, trueLabel: `System's tested win rate`, trueShort: 'system win rate',
         extra: [['Our model for this player', b.model != null ? pct(b.model) : '—'], ...(b.hist != null ? [['Past hit rate (his "true")', pct(b.hist)]] : [])],
         track: { kind: 'prop', gameId: b.g.id, week, teamId: b.teamId, pid: b.pid, sk: b.sk, side: 'over', line: b.line, label: `${name} ${what} (system)` } })}">$ Check</button>` : '';
       return `<div class="call"><span class="tag pick">${T.abbr}</span>
-        <div><b>${name} ${what}</b> <span class="muted small">vs ${O.abbr}</span>${b.status ? ` <span class="dk small">(${b.status})</span>` : ''}
+        <div><b>${name} ${what}</b> <span class="muted small">vs ${O.abbr}</span>${nvBadge(nvp, sy.hit)}${b.status ? ` <span class="dk small">(${b.status})</span>` : ''}
         <div class="why">${b.model != null ? `Model ${pct(b.model)}` : ''}${b.hist != null ? ` · hit it in ${pct(b.hist)} of last 2 seasons` : ''}${b.ypc ? ` · ${O.abbr} allows ${b.ypc.toFixed(1)} yds/carry` : ''}</div></div><span>${res}${chk}</span></div>`;
     }).join('');
     return `<div class="card"><div class="ghead"><span><b style="color:var(--text);font-size:14px">${sy.name}</b> · ${sy.origin}</span><span class="pill">${list.length} bet${list.length === 1 ? '' : 's'}</span></div>
@@ -1328,15 +1380,186 @@ function renderPosition(pos) {
     } else last = x.rating ? trackBtn(key, { kind: 'prop', gameId: x.g.id, week, teamId: x.teamId, pid: x.pid, sk: x.sk, side: x.side, line: x.line, odds: PROP_PRICE,
       label: `${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}` }) : '';
     return `<tr><td>${name} <span class="muted small">${T.abbr} vs ${O.abbr}</span>${x.status ? ` <span class="dk small">(${x.status})</span>` : ''}${x.roleOut?.length ? ' <span class="tag warn" title="Teammate out: role may change">ROLE?</span>' : ''}</td>
-      <td><b>${x.side === 'over' ? 'Over' : 'Under'} ${x.line}</b> <span class="muted">${st.label.toLowerCase()}</span></td>
+      <td><b>${x.side === 'over' ? 'Over' : 'Under'} ${x.line}</b> <span class="muted">${st.label.toLowerCase()}</span>${x.price ? nvBadge(x.price, x.real) : ''}</td>
       <td>${x.pr.mean.toFixed(st.kind === 'count' ? 1 : 0)}</td><td>${pct(x.conf)}</td><td><b>${pct(x.real)}</b></td><td>${x.rating ? fmtMl(x.maxOdds) : '—'}</td>
       <td>${x.rating ? `<span class="tag ${RATING_TAG[x.rating]}">${x.rating}</span>` : ''}</td><td>${last}${x.g.final ? '' : `<button class="btn sm chkbtn" onclick="${pc(key, propCtx(x))}">$ Check</button>`}</td></tr>`;
   });
   $('posProps').innerHTML = !wx?.ready ? '<tr><td class="muted">Loading DraftKings lines…</td></tr>'
-    : rows.length ? '<tr><th>Player</th><th>Prop (DraftKings)</th><th>Proj</th><th>Model</th><th>Realistic</th><th>Bet at</th><th>Rating</th><th></th></tr>' + rows.join('')
+    : rows.length ? `<tr><th>Player</th><th>Prop (${list.some(x => x.price) ? 'Novig' : 'DraftKings'})</th>` + '<th>Proj</th><th>Model</th><th>Realistic</th><th>Bet at</th><th>Rating</th><th></th></tr>' + rows.join('')
     : `<tr><td class="muted">${all.length ? 'No props with an edge this week. Tap "Show all props" to see every line.' : 'No DraftKings props posted for this week yet.'}</td></tr>`;
   $('posAllBtn').textContent = posShowAll ? 'Show best only' : `Show all props (${all.length})`;
   $('posInfo').innerHTML = `<b>${POS_NAME[pos]}</b> · Week ${week}` + (week <= 5 ? ' · <span class="dk">early season: the model is least reliable</span>' : '');
+}
+
+// ===================== NOVIG (through OddsPapi) =====================
+// The user's own OddsPapi key lives only in this device's localStorage. One request (/odds-by-tournaments) returns
+// every NFL game with Novig's markets; setup lookups (sport, league, market codes, team names) are cached for the season.
+const OP_API = 'https://api.oddspapi.io/v4', NV_TTL = 60 * 60 * 1000;
+const opKey = () => { try { return localStorage.getItem(`${CACHE_V}:opKey`) || ''; } catch { return ''; } };
+const useNovig = () => store.get(`${CACHE_V}:useNovig`) ?? true;
+let NV = store.get(`${CACHE_V}:opOdds`) || null; // { at, fixtures: [{ start, p1, p2, props: [[name, sk, line, side, price]] }] }
+const asList = j => Array.isArray(j) ? j : (j?.data || j?.items || []);
+async function opGet(path, params = {}) {
+  const u = new URL(OP_API + path);
+  for (const [k, v] of Object.entries({ ...params, apiKey: opKey() })) u.searchParams.set(k, v);
+  const r = await fetch(u);
+  const j = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(j?.error?.message || j?.message || `OddsPapi error ${r.status}`);
+  return j;
+}
+const normName = n => String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/\b(jr|sr|ii|iii|iv|v)\b\.?/g, '').replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+// OddsPapi market → our stat key (full-game player props only; no halves, quarters, longest, or combo stats)
+function mapMarket(m) {
+  if (!m.playerProp) return null;
+  const n = String(m.marketName || '').toLowerCase();
+  if (m.period && !/full|game|match|regular/i.test(m.period)) return null;
+  if (/1st|2nd|first|second|half|quarter|longest|fantasy|first td|anytime|interception|sack|tackle|kick|field goal|punt/.test(n)) return null;
+  if (/rush.*rec|rec.*rush|pass.*rush|rush.*pass/.test(n)) return null;
+  if (/completion/.test(n)) return 'cmp';
+  if (/pass(ing)? ?(yards|yds)/.test(n)) return 'passYds';
+  if (/pass(ing)? ?(touchdowns|tds|td)/.test(n)) return 'passTD';
+  if (/rush(ing)? ?(attempts|att)|carries/.test(n)) return 'rushAtt';
+  if (/rush(ing)? ?(yards|yds)/.test(n)) return 'rushYds';
+  if (/receiving ?(yards|yds)|rec ?yds/.test(n)) return 'recYds';
+  if (/receptions|catches/.test(n)) return 'rec';
+  return null;
+}
+async function novigSetup(force) {
+  let meta = store.get(`${CACHE_V}:opMeta`);
+  if (meta?.v === 1 && !force) return meta;
+  const sports = asList(await opGet('/sports'));
+  const sp = sports.find(x => /american football/i.test(x.sportName || x.name || '')) || sports.find(x => /football/i.test(x.sportName || '') && !/soccer/i.test(x.sportName || ''));
+  if (!sp) throw new Error("Couldn't find American football in OddsPapi's sports list.");
+  const tours = asList(await opGet('/tournaments', { sportId: sp.sportId }));
+  const nfl = tours.find(t => /^nfl$/i.test(t.tournamentName || '') || t.tournamentSlug === 'nfl') || tours.find(t => /\bnfl\b/i.test(t.tournamentName || ''));
+  if (!nfl) throw new Error("Couldn't find the NFL in OddsPapi's league list.");
+  const markets = {};
+  for (const m of asList(await opGet('/markets'))) {
+    if (m.sportId !== sp.sportId) continue;
+    const sk = mapMarket(m); if (!sk) continue;
+    markets[m.marketId] = { sk, line: +m.handicap, outcomes: Object.fromEntries((m.outcomes || []).map(o => [o.outcomeId, /under|^no$/i.test(o.outcomeName || '') ? 'under' : 'over'])) };
+  }
+  let participants = {};
+  try {
+    const pj = await opGet('/participants', { sportId: sp.sportId });
+    if (Array.isArray(pj) || Array.isArray(pj?.data)) for (const x of asList(pj)) participants[x.participantId ?? x.id] = x.participantName ?? x.name;
+    else if (pj && typeof pj === 'object') participants = pj;
+  } catch { /* fixtures may carry names already */ }
+  meta = { v: 1, sportId: sp.sportId, tournamentId: nfl.tournamentId, markets, participants, at: Date.now() };
+  store.set(`${CACHE_V}:opMeta`, meta);
+  return meta;
+}
+async function loadNovig(force) {
+  if (!opKey()) { NV = null; return; }
+  if (!force && NV && Date.now() - NV.at < NV_TTL) return;
+  const meta = await novigSetup();
+  const data = asList(await opGet('/odds-by-tournaments', { tournamentIds: meta.tournamentId, bookmakers: 'novig.us' }));
+  const name = (f, i) => f[`participant${i}Name`] || f.participants?.[i === 1 ? 'home' : 'away']?.name || meta.participants[f[`participant${i}Id`]] || '';
+  const fixtures = data.map(f => {
+    const props = [];
+    for (const [mid, mkt] of Object.entries(f.bookmakerOdds?.['novig.us']?.markets || {})) {
+      const m = meta.markets[mid]; if (!m) continue;
+      const line = Number.isInteger(m.line) ? m.line - 0.5 : m.line; // milestone "30+" → over 29.5
+      for (const [oid, oc] of Object.entries(mkt.outcomes || {})) {
+        const side = m.outcomes[oid] || 'over';
+        for (const pl of Object.values(oc.players || {})) {
+          if (pl.active === false || !(pl.price > 1) || !pl.playerName) continue;
+          props.push([pl.playerName, m.sk, line, side, +(+pl.price).toFixed(3)]);
+        }
+      }
+    }
+    return { start: f.startTime, p1: name(f, 1), p2: name(f, 2), props };
+  });
+  NV = { at: Date.now(), fixtures };
+  store.set(`${CACHE_V}:opOdds`, NV);
+}
+// match Novig's games and player names to ESPN's (cached until new data arrives)
+let NVMAP = null, NVMAP_AT = 0, NVSTATS = null;
+function novigIndex() {
+  if (!NV || !PD || !S) return null;
+  if (NVMAP && NVMAP_AT === NV.at) return NVMAP;
+  NVMAP = {}; NVMAP_AT = NV.at; NVSTATS = { games: 0, lines: 0, unmatched: new Set() };
+  const nick = id => S.teams[id].name.split(' ').pop().toLowerCase();
+  for (const g of S.games.filter(x => !x.final)) {
+    const f = NV.fixtures.find(f => Math.abs(new Date(f.start) - new Date(g.date)) < 36 * 3600e3
+      && [nick(g.home.id), nick(g.away.id)].every(k => `${f.p1} ${f.p2}`.toLowerCase().includes(k)));
+    if (!f) continue;
+    NVSTATS.games++;
+    const byName = {};
+    for (const [pid, l] of Object.entries(PD.logs)) {
+      const last = l.filter(h => h.season === S.season).pop();
+      if (last && (last.team === g.home.id || last.team === g.away.id)) byName[normName(S.names[pid])] = pid;
+    }
+    const props = {};
+    for (const [nm, sk, line, side, price] of f.props) {
+      const pid = byName[normName(nm)];
+      if (!pid) { NVSTATS.unmatched.add(nm); continue; }
+      (props[pid + ':' + sk] ??= []).push({ line, side, price }); NVSTATS.lines++;
+    }
+    NVMAP[g.id] = { props };
+  }
+  return NVMAP;
+}
+const novigFor = g => useNovig() && opKey() ? novigIndex()?.[g.id] || null : null;
+function novigPrice(g, pid, sk, line, side = 'over') {
+  return novigFor(g)?.props[pid + ':' + sk]?.find(x => x.line === line && x.side === side)?.price ?? null;
+}
+const decToAm = d => d >= 2 ? (d - 1) * 100 : -100 / (d - 1);
+// small "Novig 1.12" badge, green when the price beats our chance, red when it doesn't
+function nvBadge(price, trueP) {
+  if (!price) return '';
+  const edge = trueP - 1 / price;
+  return ` <span class="nvtag" style="${edge >= 0.015 ? 'color:var(--good)' : edge < 0 ? 'color:var(--bad)' : ''}" title="Novig ${price} = ${pct(1 / price)}; edge ${(edge * 100).toFixed(1)}%">Novig ${price}</span>`;
+}
+
+// ---------- settings ----------
+function openSettings() {
+  $('opKeyIn').value = opKey() ? '••••••••' : '';
+  $('useNovig').checked = useNovig();
+  $('useNovig').onchange = () => { store.set(`${CACHE_V}:useNovig`, $('useNovig').checked); renderAll(); };
+  showNovigStatus();
+  const d = $('settingsDlg'); if (!d.open) d.showModal();
+}
+function saveOpKey() {
+  const v = $('opKeyIn').value.trim();
+  if (!v || /^•+$/.test(v)) return showNovigStatus('Paste your key first.');
+  try { localStorage.setItem(`${CACHE_V}:opKey`, v); } catch {}
+  $('opKeyIn').value = '••••••••';
+  testOpKey().then(ok => ok && refreshNovig());
+}
+function forgetOpKey() {
+  try { for (const k of ['opKey', 'opMeta', 'opOdds']) localStorage.removeItem(`${CACHE_V}:${k}`); } catch {}
+  NV = null; NVMAP = null; $('opKeyIn').value = ''; showNovigStatus('Key removed from this device.'); renderAll();
+}
+async function testOpKey() {
+  if (!opKey()) { showNovigStatus('No key saved yet.'); return false; }
+  showNovigStatus('Checking your key…');
+  try {
+    const a = await opGet('/account'); // free: doesn't use a request
+    const sub = Array.isArray(a?.subscriptions) ? a.subscriptions[0] : (a?.subscription || a);
+    const used = sub?.request_count ?? sub?.requestCount, limit = sub?.request_limit ?? sub?.requestLimit;
+    showNovigStatus(`✅ Key works.${used != null ? ` Requests used: <b>${used}${limit ? ' of ' + limit : ''}</b> this period.` : ''}`);
+    return true;
+  } catch (e) { showNovigStatus(`<span class="neg">❌ ${e.message}</span>`); return false; }
+}
+async function refreshNovig() {
+  if (!opKey()) return showNovigStatus('Save your OddsPapi key first.');
+  showNovigStatus('Loading Novig lines… (uses 1 request; the first time also 3–4 setup requests)');
+  try { await loadNovig(true); NVMAP = null; renderAll(); showNovigStatus(); }
+  catch (e) { showNovigStatus(`<span class="neg">❌ ${e.message}</span>`); }
+}
+function showNovigStatus(msg) {
+  const box = $('opStatus');
+  if (msg) { box.innerHTML = msg; return; }
+  if (!opKey()) { box.innerHTML = 'No key saved yet. The app is using DraftKings lines from ESPN.'; return; }
+  if (!NV) { box.innerHTML = 'Key saved. Tap ↻ Refresh Novig to load lines.'; return; }
+  novigIndex();
+  const mins = Math.round((Date.now() - NV.at) / 60000);
+  const un = NVSTATS ? [...NVSTATS.unmatched] : [];
+  box.innerHTML = `Novig: <b>${NVSTATS?.games || 0}</b> games matched, <b>${NVSTATS?.lines || 0}</b> player lines · updated ${mins < 1 ? 'just now' : mins + ' min ago'} (refreshes after 60 min when you open the app).` +
+    (un.length ? `<div class="muted small" style="margin-top:4px">${un.length} Novig names didn't match a player: ${un.slice(0, 12).join(', ')}${un.length > 12 ? '…' : ''}</div>` : '') +
+    (useNovig() ? '' : '<div class="dk small" style="margin-top:4px">"Use Novig" is off, so DraftKings lines are shown.</div>');
 }
 
 // ===================== PRICE CHECK (implied vs true probability) =====================
@@ -1406,7 +1629,16 @@ function pcState(c) {
   if (!c.dist) return { trueP: c.trueP, title: c.title, facts: [[c.trueLabel, pct(c.trueP), 'pos'], ...(c.extra || [])], track: c.track, trackKey: pcKey };
   const d = c.dist, st = PROPS.stats[d.sk], lbl = st.label.toLowerCase(), n = pcLine.n, yes = pcLine.side === 'yes';
   const over = propOver(d.pr, n - 0.5), raw = yes ? over : 1 - over;
-  const trueP = d.trust != null ? 0.5 + d.trust * (raw - 0.5) : raw;
+  // realistic % = the market's chance moved toward our model by the stat's trust factor. The market's chance comes
+  // from Novig's two-sided prices when available, else the price being checked; with no price yet, 50%.
+  let anchor = 0.5;
+  if (d.trust != null) {
+    const g = S.games.find(x => x.id === d.gameId), ln = n - 0.5;
+    const pYes = g && novigPrice(g, d.pid, d.sk, ln, yes ? 'over' : 'under'), pNo = g && novigPrice(g, d.pid, d.sk, ln, yes ? 'under' : 'over');
+    const entered = parseFromSource($('pcOdds').value, pcSource);
+    anchor = pYes && pNo ? (1 / pYes) / (1 / pYes + 1 / pNo) : entered ? entered.implied : 0.5;
+  }
+  const trueP = d.trust != null ? anchor + d.trust * (raw - anchor) : raw;
   const logs = (PD.logs[d.pid] || []).filter(h => (h.season === S.season && h.week < d.week || h.season === S.season - 1) && hasRole(h.r, st.role));
   const hit = logs.length ? logs.filter(h => yes ? h.r[st.idx] >= n : h.r[st.idx] < n).length / logs.length : null;
   const title = yes ? `${d.name} ${n}+ ${lbl}` : `${d.name} under ${n} ${lbl}`;
@@ -1422,8 +1654,9 @@ function openPriceCheck(key) {
   const c = PC_CTX[key]; if (!c) return;
   pcKey = key;
   const saved = pcSaved[key];
-  if (saved && typeof saved === 'object') { pcSource = saved.src || pcSource; $('pcOdds').value = saved.v || ''; }
-  else $('pcOdds').value = saved || '';
+  if (saved && typeof saved === 'object' && saved.v) { pcSource = saved.src || pcSource; $('pcOdds').value = saved.v || ''; }
+  else if (c.novig) { pcSource = 'novig'; $('pcOdds').value = String(c.novig); } // Novig's live price for this exact bet
+  else $('pcOdds').value = typeof saved === 'string' ? saved : '';
   pcLine = c.dist ? { n: saved?.n ?? c.dist.n, side: saved?.side ?? c.dist.side } : null;
   $('pcLineRow').classList.toggle('hidden', !c.dist);
   $('pcHide').classList.toggle('hidden', !c.dist && !c.pid);
@@ -1581,10 +1814,11 @@ function renderLadder() {
         const rungs = L.rungs.map(r => {
           const his = logs.filter(h => h.r[L.idx] >= r).length / logs.length, m = propOver(pr, r - 0.5);
           const nm = S.names[pid] || pid, lbl = PROPS.stats[L.sk].label.toLowerCase();
-          const ck = pc(`${g.id}:lad:${pid}:${L.sk}:${r}`, { title: `${nm} ${r}+ ${lbl}`, trueP: m, final: g.final, pid,
+          const nvp = novigPrice(g, pid, L.sk, r - 0.5, 'over');
+          const ck = pc(`${g.id}:lad:${pid}:${L.sk}:${r}`, { title: `${nm} ${r}+ ${lbl}`, trueP: m, final: g.final, pid, novig: nvp,
             dist: { pr, sk: L.sk, trust: null, name: nm, pid, teamId: team, gameId: g.id, week, n: r, side: 'yes' } });
           return `<span class="lc chk ${m >= 0.85 ? 'hot' : ''}" onclick="${ck}" title="${r}+: hit in ${pct(his)} of ${logs.length} games; our model ${pct(m)}; fair price ${fmtMl(probToMl(Math.min(0.99, Math.max(0.01, m))))}">
-            <b>${r}+</b><span class="his">${Math.round(his * 100)}%</span><span class="mdl">${Math.round(m * 100)}%</span><span class="fo">${fmtMl(probToMl(Math.min(0.99, Math.max(0.01, m))))}</span></span>`;
+            <b>${r}+</b><span class="his">${Math.round(his * 100)}%</span><span class="mdl">${Math.round(m * 100)}%</span><span class="fo">${fmtMl(probToMl(Math.min(0.99, Math.max(0.01, m))))}</span>${nvp ? `<span class="nv" style="color:${m - 1 / nvp >= 0.015 ? 'var(--good)' : m - 1 / nvp < 0 ? 'var(--bad)' : 'var(--warn)'}">Novig ${nvp}</span>` : ''}</span>`;
         }).join('');
         cards.push({ sort: pr.mean, html: `<div class="card">
           <div class="ghead"><span><img src="${T.logo}" width="16" style="vertical-align:middle"> <b style="color:var(--text);font-size:14px">${S.names[pid] || pid}</b> ${status ? `<span class="dk">(${status})</span>` : ''}</span><span>${T.abbr} vs ${O.abbr}</span></div>
@@ -1696,7 +1930,7 @@ function renderWeek() {
 function propCtx(x) {
   const st = PROPS.stats[x.sk], name = S.names[x.pid] || x.pid, sideTxt = x.side === 'over' ? 'Over' : 'Under';
   // DraftKings "Over 13.5" = "14+" on milestone-style apps; "Under 6.5" = "No" on 7+
-  return { title: `${name} ${sideTxt} ${x.line} ${st.label.toLowerCase()}`, trueP: x.real, pid: x.pid,
+  return { title: `${name} ${sideTxt} ${x.line} ${st.label.toLowerCase()}`, trueP: x.real, pid: x.pid, novig: x.price || null,
     dist: { pr: x.pr, sk: x.sk, trust: PROP_TRUST[x.sk] ?? 0, name, pid: x.pid, teamId: x.teamId, gameId: x.g.id, week: x.g.week,
       n: Math.floor(x.line) + 1, side: x.side === 'over' ? 'yes' : 'no', dkLine: x.line } };
 }
@@ -1705,7 +1939,7 @@ function propCallRow(x) {
   const st = PROPS.stats[x.sk], name = S.names[x.pid] || x.pid;
   const key = `${x.g.id}:prop:${x.pid}:${x.sk}`;
   return `<div class="call"><span class="tag ${RATING_TAG[x.rating]}">${x.rating}</span>
-    <div><b>${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}</b>${x.status ? ` <span class="dk small">(${x.status})</span>` : ''}
+    <div><b>${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}</b>${x.price ? nvBadge(x.price, x.real) : ''}${x.status ? ` <span class="dk small">(${x.status})</span>` : ''}
       <div class="why">Model ${pct(x.conf)} → realistic ~${pct(x.real)} · projects ${x.pr.mean.toFixed(st.kind === 'count' ? 1 : 0)} · <b>bet only at ${fmtMl(x.maxOdds)} or better</b></div></div>
     ${x.g.final ? '' : `<button class="btn sm chkbtn" onclick="${pc(key, propCtx(x))}">$ Check</button>`}${x.g.final ? '' : trackBtn(key, { kind: 'prop', gameId: x.g.id, week: x.g.week, teamId: x.teamId, pid: x.pid, sk: x.sk, side: x.side, line: x.line, odds: PROP_PRICE,
       label: `${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}` })}</div>`;
@@ -1797,6 +2031,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.ser
     $('propGameSel').onchange = renderProps; $('propStatSel').onchange = renderProps;
     renderAll(); updateHiddenNote();
     loadWeekExtras(selectedWeek()).then(renderAll);
+    if (opKey()) loadNovig().then(() => { NVMAP = null; renderAll(); }).catch(e => console.warn('Novig:', e.message));
     // remove caches from older versions of the app
     try { Object.keys(localStorage).filter(k => /^nflp\d+:/.test(k) && !k.startsWith(CACHE_V + ':')).forEach(k => localStorage.removeItem(k)); } catch {}
     $('loading').classList.add('hidden');

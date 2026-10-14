@@ -128,6 +128,19 @@ Tuned on 2021-23, tested on 2024-26 (weeks 2+):
 - `data/season-YYYY.json` now also stores closing lines (`odds`, from nflverse) so past weeks show the pick that would have been made. Weeks 2-5 of 2026: 38-24 (61.3%) vs 33-28 for the old model-only picks.
 - The app fetches the snapshot with `cache: 'no-cache'` (a stale HTTP cache hid updated data).
 
+## Novig lines through OddsPapi (2026-10-14)
+
+- Novig has no public API: its own GraphQL feed (`api.novig.us/v1/graphql`) only answers allow-listed app queries, and the site runs GeoComply/anti-bot checks. Don't scrape it.
+- The app uses **OddsPapi** (`https://api.oddspapi.io/v4`, CORS-open, `apiKey` query param, free tier 250 requests/month). The user's key is entered in ⚙ Settings and stored only in localStorage (`nflp3:opKey`). Never commit or ask for it.
+- `novigSetup()` (cached for the season in `nflp3:opMeta`) calls `/sports`, `/tournaments`, `/markets` and `/participants`. `mapMarket` maps market names → our stat keys (full-game player props only).
+- `loadNovig()` makes 1 call (`/odds-by-tournaments?bookmakers=novig.us`), cached 60 min (`nflp3:opOdds`). `/account` is free and used by Test.
+- `novigIndex()` matches fixtures to ESPN games (time ± 36 h + team nicknames) and player names (normalized) to ESPN ids. The Settings status lists unmatched names.
+- When the user has a key and "Use Novig" is on, `propCandidates` → `novigCandidates`: Novig's players, lines and real decimal prices, keeping the best side/line per player-stat.
+  - **Realistic % = market + trust × (model − market)**, where market = Novig's no-vig two-sided chance (or the single price). Anchoring at 50% was only right for DK lines assumed at −115; it inflated long shots.
+  - The price checker uses the same anchor (Novig both sides → entered price → 50%).
+- Systems and ladder rungs show a "Novig x.xx" badge when Novig has that exact line. The price checker prefills Novig's price.
+- **Untested against a real OddsPapi response** (only a mock in the documented shape). On first real use, check the Settings status for matched games, unmatched names and empty markets, and adjust `mapMarket`/name matching.
+
 ## Price checker (2026-10-14)
 
 - "$ Check" on system bets, position-tab props and game-card props; tapping a ladder rung opens it too. `pc(key, ctx)` registers the context; `openPriceCheck` / `renderPriceCheck` show it.
