@@ -1530,7 +1530,7 @@ function nvBadge(price, trueP) {
 }
 
 // ---------- settings ----------
-const APP_VERSION = '2026-10-14 · 14 (bet amount buttons)'; // bump with sw.js CACHE so the user can confirm an update arrived
+const APP_VERSION = '2026-10-14 · 15 (typing fix)'; // bump with sw.js CACHE so the user can confirm an update arrived
 function openSettings() {
   $('appVersion').textContent = APP_VERSION;
   $('opKeyIn').value = opKey() ? '••••••••' : '';
@@ -1660,7 +1660,7 @@ function parseFromSource(str, srcKey) {
     const pr = parsePrice(t);
     return pr && pr.kind === 'american' ? pr : null;
   }
-  if (v > 1 && v < 100) { // decimal odds: payout per $1 including the stake (1.77 → 56.5%)
+  if (v > 1 && v <= 30) { // decimal odds: payout per $1 including the stake (1.77 → 56.5%)
     const american = v >= 2 ? (v - 1) * 100 : -100 / (v - 1);
     return { implied: 1 / v, odds: american, decimal: v, kind: 'decimal' };
   }
@@ -1720,7 +1720,7 @@ function openPriceCheck(key) {
   $('pcOdds').oninput = renderPriceCheck;
   renderPriceCheck();
   const d = $('priceCheck'); if (!d.open) d.showModal();
-  setTimeout(() => $('pcOdds').focus(), 50);
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
 }
 function renderPriceCheck() {
   const c = PC_CTX[pcKey]; if (!c) return;
