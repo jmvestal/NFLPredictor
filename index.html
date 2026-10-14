@@ -118,6 +118,17 @@ dialog#teamsHelp::backdrop{background:rgba(0,0,0,.6)}
 .math b{color:var(--good)}
 #teamsTbl tr[data-id]{cursor:pointer}
 #teamsTbl tr.sel td{background:rgba(59,130,246,.12)}
+.ladder{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.lc{display:inline-grid;grid-template-columns:auto auto;gap:0 6px;align-items:baseline;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 7px;font-variant-numeric:tabular-nums}
+.ladder .lc{display:grid}
+.lc b{grid-column:1/3;font-size:13px}
+.lc .his{color:var(--muted);font-size:12px}
+.lc .mdl{color:var(--good);font-weight:700;font-size:13px;text-align:right}
+.lc .fo{grid-column:1/3;color:var(--muted);font-size:11px}
+.lc.hot{border-color:var(--good);background:rgba(34,197,94,.10)}
+.kv{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:4px}
+.kv b{color:var(--text)}
+.kv .ok{color:var(--good)}
 .sectionhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:14px 0 8px}
 .sectionhead h3{margin:0}
 @media (max-width:420px){.team{grid-template-columns:24px 1fr 42px 42px 50px 56px}}
@@ -184,6 +195,27 @@ dialog#teamsHelp::backdrop{background:rgba(0,0,0,.6)}
       <b>System</b>: the "easy" alternate prop for this position (QB 1+ TD, RB 30+ rushing yards, WR/TE 3+ catches), tested 2021–26. It wins small and loses big, so only bet at the listed price or better.<br>
       <b>Best props</b>: DraftKings lines where the model's <b>realistic</b> chance beats a −115 price. Only bet at the "Bet at" odds or better.
       QB passing yards and WR receiving yards rarely qualify; the model doesn't beat DraftKings on those.
+    </div>
+  </section>
+
+  <section id="tab-ladder" class="hidden">
+    <div class="bar">
+      <nav class="chips" id="ladderPos">
+        <button data-pos="QB" class="active">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR/TE</button>
+      </nav>
+      <select id="ladderGame"></select>
+    </div>
+    <div class="muted small" id="ladderInfo" style="margin-bottom:8px"></div>
+    <div class="grid" id="ladderCards"></div>
+    <div class="note">
+      <b>How to read a ladder rung:</b> <span class="lc"><b>200+</b><span class="his">91%</span><span class="mdl">86%</span><span class="fo">-614</span></span>
+      = the player reached 200+ in <span class="his">91%</span> of his games this season and last (the "true probability" LINEMAKER uses) ·
+      our model gives <span class="mdl">86%</span> · fair price <span class="fo">-614</span>. Only bet that rung if your sportsbook's price is <b>better than the fair price</b>.<br>
+      In testing, the past hit rate ran 5–10 points <b>too high</b> while our model matched real results, so trust the green number.
+      Rungs our model rates 85%+ are highlighted.<br>
+      <b>His projections:</b> QB = completions per game × yards per completion the defense allows · RB = carries per game × yards per carry the defense allows ·
+      WR/TE = catches per game × yards per completion the defense allows.
+      His filters: QB/WR defense allows 10.5+ yds/completion; RB defense allows 4.0–4.5+ yds/carry; QB 1+ TD defense allows 1.5+ TDs/game.
     </div>
   </section>
 
@@ -501,7 +533,7 @@ let S = null, P = null;
 const SECTIONS = {
   games: [['week', 'Picks'], ['picks', 'Model']],
   players: [['pos-QB', 'QB'], ['pos-RB', 'RB'], ['pos-WR', 'WR/TE']],
-  props: [['props', 'Props'], ['tracker', 'Tracker']],
+  props: [['props', 'Props'], ['ladder', 'Ladders'], ['tracker', 'Tracker']],
   teams: [['teams', 'Teams']],
 };
 const lastSub = {}; // remembers the sub-tab used in each section
@@ -519,7 +551,8 @@ function showTab(t) {
   $('subTabs').innerHTML = subs.length > 1 ? subs.map(([id, label]) => `<button data-tab="${id}" class="${id === t ? 'active' : ''}">${label}</button>`).join('') : '';
   $('subTabs').querySelectorAll('button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
   const view = t.startsWith('pos-') ? 'pos' : t;
-  for (const v of ['soon', 'week', 'pos', 'picks', 'teams', 'props', 'tracker']) $('tab-' + v).classList.toggle('hidden', v !== view);
+  for (const v of ['soon', 'week', 'pos', 'picks', 'teams', 'props', 'ladder', 'tracker']) $('tab-' + v).classList.toggle('hidden', v !== view);
+  if (t === 'ladder') renderLadder();
   if (t === 'tracker') renderTracker();
   if (view === 'pos') renderPosition(t.slice(4));
   window.scrollTo(0, 0);
@@ -531,7 +564,7 @@ function setSport(sp) {
   const nfl = sp === 'NFL';
   for (const id of ['secTabs', 'subTabs', 'weekSel']) $(id).classList.toggle('hidden', !nfl);
   if (nfl) return showTab(curTab);
-  for (const v of ['week', 'pos', 'picks', 'teams', 'props', 'tracker']) $('tab-' + v).classList.add('hidden');
+  for (const v of ['week', 'pos', 'picks', 'teams', 'props', 'ladder', 'tracker']) $('tab-' + v).classList.add('hidden');
   $('tab-soon').classList.remove('hidden');
   $('soonIcon').textContent = { NBA: '🏀', MLB: '⚾', NHL: '🏒' }[sp];
   $('soonTitle').textContent = `${sp} coming soon`;
@@ -1228,6 +1261,100 @@ function renderPosition(pos) {
   $('posInfo').innerHTML = `<b>${POS_NAME[pos]}</b> · Week ${week}` + (week <= 5 ? ' · <span class="dk">early season: the model is least reliable</span>' : '');
 }
 
+// ===================== LADDERS (LINEMAKER-style inputs + our model) =====================
+const LADDERS = {
+  QB: { sk: 'passYds', idx: 2, rungs: [150, 175, 200, 225, 250, 275], role: h => h.r[1] >= 10 },
+  RB: { sk: 'rushYds', idx: 6, rungs: [30, 40, 50, 60, 70, 80], role: h => h.r[5] >= 3 && h.r[1] < 10 },
+  WR: { sk: 'recYds', idx: 9, rungs: [20, 30, 40, 50, 60, 70], role: h => (h.r[11] >= 1 || h.r[8] >= 1) && h.r[5] < 3 && h.r[1] < 10 },
+};
+let ladderPos = 'QB';
+document.querySelectorAll('#ladderPos button').forEach(b => b.onclick = () => {
+  ladderPos = b.dataset.pos;
+  document.querySelectorAll('#ladderPos button').forEach(x => x.classList.toggle('active', x === b));
+  renderLadder();
+});
+// what a defense allowed per game this season before `week` (3+ games), else null
+function defStats(opp, week) {
+  const g = (PD.allowed[S.season + ':' + opp] || []).filter(x => x.week < week);
+  if (g.length < 3) return null;
+  const t = i => g.reduce((a, x) => a + x.tot[i], 0);
+  return { ypcPass: t(2) / t(0), ypcRush: t(6) / t(5), passTDpg: t(3) / g.length };
+}
+function teamTargets(teamId, week) {
+  const t = {};
+  for (const [pid, l] of Object.entries(PD.logs)) for (const h of l) if (h.season === S.season && h.team === teamId && h.week < week) t[pid] = (t[pid] || 0) + h.r[11];
+  return t;
+}
+function renderLadder() {
+  if (!PD || !curWeek) return;
+  const week = selectedWeek(), L = LADDERS[ladderPos];
+  const games = S.games.filter(g => g.week === week);
+  const gs = $('ladderGame'), prev = gs.value;
+  gs.innerHTML = '<option value="">All games</option>' + games.map(g => `<option value="${g.id}">${S.teams[g.away.id].abbr} @ ${S.teams[g.home.id].abbr}</option>`).join('');
+  if (games.some(g => g.id === prev)) gs.value = prev;
+  gs.onchange = renderLadder;
+  const cards = [];
+  for (const g of games.filter(x => !gs.value || x.id === gs.value)) {
+    for (const [team, opp] of [[g.away.id, g.home.id], [g.home.id, g.away.id]]) {
+      const d = defStats(opp, week), O = S.teams[opp], T = S.teams[team];
+      const tgts = teamTargets(team, week), teamTg = Object.values(tgts).reduce((a, b) => a + b, 0) || 1;
+      // players for this position on this team
+      let pids;
+      if (ladderPos === 'QB') pids = [primaryQB(team, week)].filter(Boolean);
+      else pids = activePlayers(team, S.season, week).filter(pid => {
+        const cur = (PD.logs[pid] || []).filter(h => h.season === S.season && h.week < week && L.role(h));
+        if (cur.length < 2) return false;
+        if (ladderPos === 'RB') return cur.reduce((a, h) => a + h.r[5], 0) / cur.length >= 8;
+        return (tgts[pid] || 0) / teamTg >= 0.15;
+      });
+      for (const pid of pids) {
+        const status = injuryStatus(g, team, pid);
+        if (status && OUT_RE.test(status)) continue;
+        const logs = (PD.logs[pid] || []).filter(h => (h.season === S.season && h.week < week || h.season === S.season - 1) && L.role(h));
+        const cur = logs.filter(h => h.season === S.season);
+        if (!cur.length) continue;
+        const avg = idx => cur.reduce((a, h) => a + h.r[idx], 0) / cur.length;
+        const pr = projectProp(pid, L.sk, S.season, week, opp, g);
+        if (!pr) continue;
+        const ok = (v, thr) => v != null && v >= thr ? 'ok' : '';
+        let kv = '', hisProj = null;
+        if (ladderPos === 'QB') {
+          hisProj = d ? avg(0) * d.ypcPass : null;
+          const last = (PD.logs[pid] || []).filter(h => h.season === S.season - 1 && h.team === team && h.r[1] >= 10);
+          const tdAll = logs.filter(h => h.r[3] >= 1).length / logs.length;
+          const tdLast = last.length ? last.filter(h => h.r[3] >= 1).length / last.length : null;
+          const prTD = projectProp(pid, 'passTD', S.season, week, opp, g);
+          kv = `<span>Completions/g <b>${avg(0).toFixed(1)}</b></span><span>${O.abbr} allows <b class="${ok(d?.ypcPass, 10.5)}">${d ? d.ypcPass.toFixed(1) : '—'}</b> yds/completion</span>
+            <span>His projection <b>${hisProj ? Math.round(hisProj) : '—'}</b></span><span>Our projection <b>${Math.round(pr.mean)}</b></span>
+            <span>1+ TD: last season <b>${tdLast != null ? pct(tdLast) : '—'}</b>, both seasons <b>${pct(tdAll)}</b>, our model <b class="ok">${prTD ? pct(propOver(prTD, 0.5)) : '—'}</b></span>
+            <span>${O.abbr} allows <b class="${ok(d?.passTDpg, 1.5)}">${d ? d.passTDpg.toFixed(1) : '—'}</b> pass TDs/g</span>`;
+        } else if (ladderPos === 'RB') {
+          hisProj = d ? avg(5) * d.ypcRush : null;
+          kv = `<span>Carries/g <b>${avg(5).toFixed(1)}</b></span><span>${O.abbr} allows <b class="${ok(d?.ypcRush, 4.5)}">${d ? d.ypcRush.toFixed(1) : '—'}</b> yds/carry</span>
+            <span>His projection <b>${hisProj ? Math.round(hisProj) : '—'}</b></span><span>Our projection <b>${Math.round(pr.mean)}</b></span>`;
+        } else {
+          hisProj = d ? avg(8) * d.ypcPass : null;
+          kv = `<span>Target share <b>${pct((tgts[pid] || 0) / teamTg)}</b></span><span>Targets/g <b>${avg(11).toFixed(1)}</b></span><span>Catches/g <b>${avg(8).toFixed(1)}</b></span>
+            <span>${O.abbr} allows <b class="${ok(d?.ypcPass, 10.5)}">${d ? d.ypcPass.toFixed(1) : '—'}</b> yds/completion</span>
+            <span>His projection <b>${hisProj ? Math.round(hisProj) : '—'}</b></span><span>Our projection <b>${Math.round(pr.mean)}</b></span>`;
+        }
+        const rungs = L.rungs.map(r => {
+          const his = logs.filter(h => h.r[L.idx] >= r).length / logs.length, m = propOver(pr, r - 0.5);
+          return `<span class="lc ${m >= 0.85 ? 'hot' : ''}" title="${r}+: hit in ${pct(his)} of ${logs.length} games; our model ${pct(m)}; fair price ${fmtMl(probToMl(Math.min(0.99, Math.max(0.01, m))))}">
+            <b>${r}+</b><span class="his">${Math.round(his * 100)}%</span><span class="mdl">${Math.round(m * 100)}%</span><span class="fo">${fmtMl(probToMl(Math.min(0.99, Math.max(0.01, m))))}</span></span>`;
+        }).join('');
+        cards.push({ sort: pr.mean, html: `<div class="card">
+          <div class="ghead"><span><img src="${T.logo}" width="16" style="vertical-align:middle"> <b style="color:var(--text);font-size:14px">${S.names[pid] || pid}</b> ${status ? `<span class="dk">(${status})</span>` : ''}</span><span>${T.abbr} vs ${O.abbr}</span></div>
+          <div class="kv">${kv}</div>
+          <div class="ladder">${rungs}</div></div>` });
+      }
+    }
+  }
+  cards.sort((a, b) => b.sort - a.sort);
+  $('ladderCards').innerHTML = cards.map(c => c.html).join('') || '<div class="muted">No players with enough games yet.</div>';
+  $('ladderInfo').innerHTML = `Week ${week} · ${cards.length} ${ladderPos === 'WR' ? 'receivers (15%+ of targets)' : ladderPos === 'RB' ? 'running backs (8+ carries/g)' : 'quarterbacks'} · each rung: <span class="his">past hit rate</span> · <span class="mdl" style="color:var(--good)">our model</span> · fair price`;
+}
+
 // ===================== THIS WEEK CARD =====================
 // Most accurate winner pick = the Vegas favorite (66.8% right 2024-26 vs 63.9% for our model; blending didn't beat it).
 // Confidence comes from how strong a favorite Vegas makes them; our model only matters in the 60-70% band,
@@ -1392,6 +1519,7 @@ function renderTracker() {
 
 function renderAll() {
   renderGames(); renderWeek(); renderProps();
+  if (curTab === 'ladder') renderLadder();
   if (curTab.startsWith('pos-')) renderPosition(curTab.slice(4));
   if (!$('tab-tracker').classList.contains('hidden')) renderTracker();
 }

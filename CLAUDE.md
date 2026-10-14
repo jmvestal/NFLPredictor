@@ -128,6 +128,17 @@ Tuned on 2021-23, tested on 2024-26 (weeks 2+):
 - `data/season-YYYY.json` now also stores closing lines (`odds`, from nflverse) so past weeks show the pick that would have been made. Weeks 2-5 of 2026: 38-24 (61.3%) vs 33-28 for the old model-only picks.
 - The app fetches the snapshot with `cache: 'no-cache'` (a stale HTTP cache hid updated data).
 
+## Ladders tab and the same-game parlay test (2026-10-14)
+
+- **Props → Ladders** (`renderLadder`): per QB / RB (8+ carries/g) / WR-TE (15%+ target share), LINEMAKER's inputs plus ours.
+  - QB: completions/g, opponent yards per completion, his projection (cmp × yds/cmp), our projection, 1+ TD rates, opponent pass TDs/g.
+  - RB: carries/g × opponent yds/carry. WR: target share, targets/catches per game, catches × opponent yds/completion.
+  - Each ladder rung shows the past hit rate (this + last season), our model %, and fair odds. Rungs where our model is ≥ 85% are highlighted.
+- `backtest/sgp_test.js`: his "86%" SGP (QB 200+ & WR1 40+, defense allows 10.5+ yds/completion) hit **53.1%** over 1,131 games. His strict "both legs 90%+" version hit 66.7% (n = 12). The defense filter adds nothing.
+  - The legs are correlated: both hit ~5-6 pts more often than independent legs would.
+  - **Our version, QB 175+ & WR1 30+ when model P(QB) × P(WR) + 0.05 ≥ 80%: 87.0% (n = 92).** Bet at about −600 or better.
+- His projection formulas run far above results: Stafford 27.8 cmp × 14.3 = 399 vs our 277.
+
 ## Navigation and phone app (latest)
 
 - Header rows (rebuilt on the work PC 2026-10-14 from the Mac session's description):
