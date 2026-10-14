@@ -102,6 +102,18 @@ nav.sub button.active{color:var(--text);border-bottom-color:var(--accent);backgr
 nav.sub:empty{display:none}
 .soon{text-align:center;padding:60px 20px}
 .soon .big{font-size:56px}
+.legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:8px;margin-bottom:12px}
+.legend div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted)}
+.legend b{display:block;color:var(--text);font-size:13px}
+.explain h3{margin:0 0 4px;font-size:15px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.step{display:grid;grid-template-columns:28px 1fr;gap:8px;padding:9px 0;border-top:1px solid var(--line)}
+.step .n{width:24px;height:24px;border-radius:50%;background:var(--chip);color:var(--accent);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+.step .t{font-weight:600}
+.step .why{margin:2px 0 4px}
+.math{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;background:var(--panel2);border-radius:6px;padding:6px 8px;display:inline-block;white-space:normal}
+.math b{color:var(--good)}
+#teamsTbl tr[data-id]{cursor:pointer}
+#teamsTbl tr.sel td{background:rgba(59,130,246,.12)}
 .sectionhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:14px 0 8px}
 .sectionhead h3{margin:0}
 @media (max-width:420px){.team{grid-template-columns:24px 1fr 42px 42px 50px 56px}}
@@ -198,10 +210,16 @@ nav.sub:empty{display:none}
   </section>
 
   <section id="tab-teams" class="hidden">
-    <div class="bar"><span class="muted small" id="teamsInfo"></span><button class="btn sm" id="totalsBtn" onclick="showTotals = !showTotals; renderTeams()">Show season totals</button></div>
+    <div class="legend">
+      <div><b>Scores</b><span>Points this offense would score in a normal game against an <i>average</i> defense</span></div>
+      <div><b>Allows</b><span>Points this defense would give up against an <i>average</i> offense (lower is better)</span></div>
+      <div><b>Margin</b><span>Scores − Allows: how many points better than a typical opponent</span></div>
+      <div><b>Off / Def PPP</b><span>Points per play scored / allowed: the two numbers everything is built from</span></div>
+    </div>
+    <div class="card explain" id="teamExplain"></div>
+    <div class="bar" style="margin-top:14px"><span class="muted small" id="teamsInfo"></span><button class="btn sm" id="totalsBtn" onclick="showTotals = !showTotals; renderTeams()">Show season totals</button></div>
     <div class="tablewrap"><table id="teamsTbl"></table></div>
-    <div class="note" id="teamsNote"><b>Scores</b> = points the offense would score in a normal game against an average defense.
-      <b>Allows</b> = points the defense would give up against an average offense. <b>Margin</b> = Scores − Allows, how many points better than a typical opponent (tap any column to sort).<br>
+    <div class="note" id="teamsNote">Tap a column name to sort, or tap a team to see its numbers worked out above.<br>
       Off PPP = points scored ÷ own offensive plays. Def PPP = points allowed ÷ opponent offensive plays (lower is better). PPP and Plays/G blend this season with last season (see "Last-season games"); the season totals are this season only, so dividing Pts by Plays won't match Off PPP. Points include defensive/special-teams scores.</div>
   </section>
 
@@ -609,7 +627,63 @@ function renderGames() {
 }
 
 let sortK = 'margin', sortDir = -1;
-let showTotals = false;
+let showTotals = false, exampleTeam = null;
+
+// Step-by-step walkthrough of one team's numbers, using its real totals
+function renderTeamExample(r, byMargin, lgPlays) {
+  if (!r) { $('teamExplain').innerHTML = ''; return; }
+  const T = r.t, lg = P.leaguePPP, rank = byMargin.findIndex(x => x.id === r.id) + 1;
+  const prev = S.prevTotals?.[r.id], G = r.prevGames || 0;
+  const per = k => prev && prev.gp ? prev[k] / prev.gp : 0;
+  const d1 = x => x.toFixed(1), d3 = x => x.toFixed(3);
+  const offPts = r.ptsFor + G * per('ptsFor'), offPl = r.offPlays + G * per('offPlays');
+  const defPts = r.ptsAg + G * per('ptsAg'), defPl = r.defPlays + G * per('defPlays');
+  const blendTxt = (pts, pl, ptsK, plK, word) => G
+    ? `This season ${T.abbr} ${word} <b>${pts}</b> points on <b>${pl}</b> plays. Early-season numbers jump around, so ${G} games of last season's averages
+       (${d1(per(ptsK))} points and ${d1(per(plK))} plays per game) are mixed in. They fade as this season's games pile up.`
+    : `This season ${T.abbr} ${word} <b>${pts}</b> points on <b>${pl}</b> plays.`;
+  const select = `<select id="exampleSel">${Object.values(P.teams).map(x => S.teams[x.id]).sort((a, b) => a.name.localeCompare(b.name))
+    .map(t => `<option value="${t.id}" ${t.id === r.id ? 'selected' : ''}>${t.name}</option>`).join('')}</select>`;
+
+  // this week's game: the same formula with the real opponent instead of an average one
+  let weekStep = '';
+  const g = S.games.find(x => x.week === selectedWeek() && (x.home.id === r.id || x.away.id === r.id));
+  if (g) {
+    const hfa = parseFloat($('hfaIn').value) || 0, qbPen = parseFloat($('qbIn').value) || 0, sd = parseFloat($('sdIn').value) || 13.5;
+    const p = predict(P, g, hfa, sd, qbPen, backupSet([g]));
+    const home = g.home.id === r.id, oppId = home ? g.away.id : g.home.id, O = P.teams[oppId], OT = S.teams[oppId];
+    if (p && O) {
+      const mine = home ? p.hPts : p.aPts, theirs = home ? p.aPts : p.hPts, win = home ? p.pHome : 1 - p.pHome;
+      weekStep = `<div class="step"><div class="n">6</div><div><div class="t">This week: ${home ? 'vs' : '@'} ${OT.name}</div>
+        <div class="why">Same math, but with ${OT.abbr}'s real defense (${d3(O.defPPP)} per play) instead of an average one. This is exactly how the Games tab projects scores.</div>
+        <span class="math">(${d3(r.offPPP)} + ${d3(O.defPPP)}) ÷ 2 × ${d1(r.playsPG)} plays = <b>${d1(mine)}</b> for ${T.abbr}</span>
+        <div class="why" style="margin-top:6px">Projected score: <b>${T.abbr} ${d1(mine)} – ${OT.abbr} ${d1(theirs)}</b> · ${T.abbr} wins ${pct(win)} of the time${g.final ? ` · actual: ${home ? g.home.score : g.away.score}–${home ? g.away.score : g.home.score}` : ''}</div></div></div>`;
+    }
+  } else weekStep = `<div class="step"><div class="n">6</div><div><div class="t">This week</div><div class="why">${T.abbr} doesn't play in Week ${selectedWeek()} (bye).</div></div></div>`;
+
+  $('teamExplain').innerHTML = `
+    <h3><span>How the numbers work: <img src="${T.logo}" style="width:20px;vertical-align:middle"> ${T.name}</span>${select}</h3>
+    <div class="why">Every number in the table comes from two simple rates: points per play on offense and on defense. Here is ${T.abbr}'s math, start to finish.</div>
+    <div class="step"><div class="n">1</div><div><div class="t">Offense: points per play</div>
+      <div class="why">${blendTxt(r.ptsFor, r.offPlays, 'ptsFor', 'offPlays', 'scored')}</div>
+      <span class="math">(${r.ptsFor}${G ? ` + ${G}×${d1(per('ptsFor'))}` : ''}) ÷ (${r.offPlays}${G ? ` + ${G}×${d1(per('offPlays'))}` : ''}) = ${d1(offPts)} ÷ ${d1(offPl)} = <b>${d3(r.offPPP)}</b> points per play</span>
+      <div class="why" style="margin-top:4px">League average is ${d3(lg)}, so ${T.abbr}'s offense is ${r.offPPP >= lg ? '<span class="pos">better</span>' : '<span class="neg">worse</span>'} than average.</div></div></div>
+    <div class="step"><div class="n">2</div><div><div class="t">Defense: points allowed per play</div>
+      <div class="why">${blendTxt(r.ptsAg, r.defPlays, 'ptsAg', 'defPlays', 'allowed')}</div>
+      <span class="math">${d1(defPts)} ÷ ${d1(defPl)} = <b>${d3(r.defPPP)}</b> points allowed per play</span>
+      <div class="why" style="margin-top:4px">Lower is better. League average is ${d3(lg)}, so ${T.abbr}'s defense is ${r.defPPP <= lg ? '<span class="pos">better</span>' : '<span class="neg">worse</span>'} than average.</div></div></div>
+    <div class="step"><div class="n">3</div><div><div class="t">Scores: points vs an average defense</div>
+      <div class="why">Average ${T.abbr}'s offense with an average defense, then multiply by how many plays ${T.abbr} runs per game.</div>
+      <span class="math">(${d3(r.offPPP)} + ${d3(lg)}) ÷ 2 × ${d1(r.playsPG)} plays = <b>${d1(r.scores)}</b> points</span></div></div>
+    <div class="step"><div class="n">4</div><div><div class="t">Allows: points vs an average offense</div>
+      <div class="why">Average ${T.abbr}'s defense with an average offense, times a typical team's plays per game.</div>
+      <span class="math">(${d3(lg)} + ${d3(r.defPPP)}) ÷ 2 × ${d1(lgPlays)} plays = <b>${d1(r.allows)}</b> points</span></div></div>
+    <div class="step"><div class="n">5</div><div><div class="t">Margin</div>
+      <span class="math">${d1(r.scores)} − ${d1(r.allows)} = <b>${sgn(r.margin)}</b></span>
+      <div class="why" style="margin-top:4px">${T.abbr} is about <b>${Math.abs(r.margin).toFixed(1)} points ${r.margin >= 0 ? 'better' : 'worse'}</b> than a typical opponent: <b>#${rank} of ${byMargin.length}</b>.</div></div></div>
+    ${weekStep}`;
+  $('exampleSel').onchange = () => { exampleTeam = $('exampleSel').value; renderTeams(); };
+}
 function renderTeams() {
   // Points in a normal game, using the model's own formula against a league-average opponent:
   // Scores = avg(team Off PPP, league PPP) × team plays/game; Allows = avg(league PPP, team Def PPP) × league plays/game
@@ -634,7 +708,7 @@ function renderTeams() {
   rows.sort((a, b) => (sortK === 'name' ? a.t.abbr.localeCompare(b.t.abbr) : a[sortK] - b[sortK]) * sortDir);
   const lg = P.leaguePPP;
   $('teamsTbl').innerHTML = `<tr>${cols.map(([k, l]) => `<th data-k="${k}" title="${TIPS[k] || ''}">${l}${k === sortK ? (sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('')}</tr>` +
-    rows.map((r, i) => `<tr><td>${i + 1}</td><td><img src="${r.t.logo}" style="width:18px;vertical-align:middle;margin-right:6px">${r.t.abbr} <span class="muted small">${r.w}-${r.l}${r.tie ? '-' + r.tie : ''}</span></td>
+    rows.map((r, i) => `<tr data-id="${r.id}" class="${r.id === exampleTeam ? 'sel' : ''}"><td>${i + 1}</td><td><img src="${r.t.logo}" style="width:18px;vertical-align:middle;margin-right:6px">${r.t.abbr} <span class="muted small">${r.w}-${r.l}${r.tie ? '-' + r.tie : ''}</span></td>
       <td>${f1(r.scores)}</td><td>${f1(r.allows)}</td><td class="${r.margin >= 0 ? 'pos' : 'neg'}"><b>${sgn(r.margin)}</b></td>
       <td class="${r.offPPP >= lg ? 'pos' : 'neg'}">${r.offPPP.toFixed(3)}</td><td class="${r.defPPP <= lg ? 'pos' : 'neg'}">${r.defPPP.toFixed(3)}</td><td>${f1(r.playsPG)}</td>` +
       (showTotals ? `<td>${r.gp}</td><td>${r.ptsFor}</td><td>${r.offPlays}</td><td>${r.ptsAg}</td><td>${r.defPlays}</td>` : '') + `</tr>`).join('');
@@ -644,6 +718,11 @@ function renderTeams() {
     renderTeams();
   });
   $('teamsInfo').innerHTML = `Through week ${selectedWeek() - 1} · league average ${lg.toFixed(3)} points per play, ${f1(lgPlays)} plays per game`;
+  $('teamsTbl').querySelectorAll('tr[data-id]').forEach(tr => tr.onclick = () => { exampleTeam = tr.dataset.id; renderTeams(); $('teamExplain').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  // worked example: the chosen team, or the #1 team by Margin
+  const byMargin = rows.slice().sort((a, b) => b.margin - a.margin);
+  if (!rows.some(r => r.id === exampleTeam)) exampleTeam = byMargin[0]?.id;
+  renderTeamExample(rows.find(r => r.id === exampleTeam), byMargin, lgPlays);
   $('totalsBtn').textContent = showTotals ? 'Hide season totals' : 'Show season totals';
 }
 
