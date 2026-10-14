@@ -182,11 +182,13 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.6)}
       Free keys: <a href="https://oddspapi.io" target="_blank" rel="noopener">oddspapi.io</a> (250 requests a month; the app uses about 1 per refresh).</div>
     <input id="opKeyIn" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your OddsPapi API key" style="width:100%;font-size:16px;padding:10px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px">
     <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="useNovig"> Use Novig's players, lines and prices instead of DraftKings</label>
+    <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="nvMixed"> Also show DraftKings props for players Novig doesn't have (marked "DK only")</label>
     <div class="bar" style="margin-top:10px">
       <button class="btn sm" onclick="saveOpKey()">Save</button>
       <button class="btn sm" onclick="testOpKey()">Test</button>
       <button class="btn sm" onclick="refreshNovig()">↻ Refresh Novig</button>
       <button class="btn sm" onclick="forgetOpKey()">Remove key</button>
+      <button class="btn sm" onclick="copyNovigReport()">📋 Copy report</button>
     </div>
     <div id="opStatus" class="pcresult">No key saved yet.</div>
   </dialog>
@@ -1223,11 +1225,14 @@ function playerTeam(pid, week) {
 }
 function propCandidates(g) {
   const nv = novigFor(g);
-  if (nv) return novigCandidates(g, nv);
+  if (nv && !(store.get(`${CACHE_V}:nvMixed`) ?? false)) return novigCandidates(g, nv);
+  const nvList = nv ? novigCandidates(g, nv) : [];
+  const nvKeys = new Set(nvList.map(x => x.pid + ':' + x.sk));
   const lines = WX[g.week]?.games[g.id]?.props || {};
   const out = [];
   for (const [k, line] of Object.entries(lines)) {
     const [pid, sk] = k.split(':');
+    if (nvKeys.has(k)) continue;                   // Novig has this one (mixed mode)
     if (hiddenPlayers.has(pid)) continue;          // not offered on the user's apps
     if (sk === 'rec' && line <= 0.5) continue;     // "1+ catch" lines: rarely offered elsewhere, usually heavily priced
     const teamId = playerTeam(pid, g.week);
@@ -1241,9 +1246,9 @@ function propCandidates(g) {
     const e = propEdge(sk, conf);
     const roleOut = roleChange(g, teamId, pid, sk);
     if (roleOut.length) e.rating = null; // usage likely shifts; skip
-    out.push({ g, teamId, oppId, pid, sk, pr, line, over, side, conf, ...e, status, roleOut });
+    out.push({ g, teamId, oppId, pid, sk, pr, line, over, side, conf, ...e, status, roleOut, dkOnly: !!nv });
   }
-  return out.sort((a, b) => b.conf - a.conf);
+  return [...nvList, ...out.sort((a, b) => b.conf - a.conf)];
 }
 // Novig version: Novig's own players, lines and real prices; for each player/stat keep the side and line with the best edge
 function novigCandidates(g, nv) {
@@ -1380,7 +1385,7 @@ function renderPosition(pos) {
     } else last = x.rating ? trackBtn(key, { kind: 'prop', gameId: x.g.id, week, teamId: x.teamId, pid: x.pid, sk: x.sk, side: x.side, line: x.line, odds: PROP_PRICE,
       label: `${name} ${x.side === 'over' ? 'Over' : 'Under'} ${x.line} ${st.label.toLowerCase()}` }) : '';
     return `<tr><td>${name} <span class="muted small">${T.abbr} vs ${O.abbr}</span>${x.status ? ` <span class="dk small">(${x.status})</span>` : ''}${x.roleOut?.length ? ' <span class="tag warn" title="Teammate out: role may change">ROLE?</span>' : ''}</td>
-      <td><b>${x.side === 'over' ? 'Over' : 'Under'} ${x.line}</b> <span class="muted">${st.label.toLowerCase()}</span>${x.price ? nvBadge(x.price, x.real) : ''}</td>
+      <td><b>${x.side === 'over' ? 'Over' : 'Under'} ${x.line}</b> <span class="muted">${st.label.toLowerCase()}</span>${x.price ? nvBadge(x.price, x.real) : ''}${x.dkOnly ? ' <span class="tag skip" title="Novig doesn\'t list this player/stat yet; DraftKings line">DK only</span>' : ''}</td>
       <td>${x.pr.mean.toFixed(st.kind === 'count' ? 1 : 0)}</td><td>${pct(x.conf)}</td><td><b>${pct(x.real)}</b></td><td>${x.rating ? fmtMl(x.maxOdds) : '—'}</td>
       <td>${x.rating ? `<span class="tag ${RATING_TAG[x.rating]}">${x.rating}</span>` : ''}</td><td>${last}${x.g.final ? '' : `<button class="btn sm chkbtn" onclick="${pc(key, propCtx(x))}">$ Check</button>`}</td></tr>`;
   });
@@ -1427,17 +1432,18 @@ function mapMarket(m) {
 }
 async function novigSetup(force) {
   let meta = store.get(`${CACHE_V}:opMeta`);
-  if (meta?.v === 1 && !force) return meta;
+  if (meta?.v === 2 && !force) return meta;
   const sports = asList(await opGet('/sports'));
   const sp = sports.find(x => /american football/i.test(x.sportName || x.name || '')) || sports.find(x => /football/i.test(x.sportName || '') && !/soccer/i.test(x.sportName || ''));
   if (!sp) throw new Error("Couldn't find American football in OddsPapi's sports list.");
   const tours = asList(await opGet('/tournaments', { sportId: sp.sportId }));
   const nfl = tours.find(t => /^nfl$/i.test(t.tournamentName || '') || t.tournamentSlug === 'nfl') || tours.find(t => /\bnfl\b/i.test(t.tournamentName || ''));
   if (!nfl) throw new Error("Couldn't find the NFL in OddsPapi's league list.");
-  const markets = {};
+  const markets = {}, skipped = {};
   for (const m of asList(await opGet('/markets'))) {
     if (m.sportId !== sp.sportId) continue;
-    const sk = mapMarket(m); if (!sk) continue;
+    const sk = mapMarket(m);
+    if (!sk) { if (m.playerProp) skipped[m.marketId] = `${m.marketName}${m.period ? ' (' + m.period + ')' : ''}`; continue; }
     markets[m.marketId] = { sk, line: +m.handicap, outcomes: Object.fromEntries((m.outcomes || []).map(o => [o.outcomeId, /under|^no$/i.test(o.outcomeName || '') ? 'under' : 'over'])) };
   }
   let participants = {};
@@ -1446,7 +1452,7 @@ async function novigSetup(force) {
     if (Array.isArray(pj) || Array.isArray(pj?.data)) for (const x of asList(pj)) participants[x.participantId ?? x.id] = x.participantName ?? x.name;
     else if (pj && typeof pj === 'object') participants = pj;
   } catch { /* fixtures may carry names already */ }
-  meta = { v: 1, sportId: sp.sportId, tournamentId: nfl.tournamentId, markets, participants, at: Date.now() };
+  meta = { v: 2, sportId: sp.sportId, tournamentId: nfl.tournamentId, markets, skipped, participants, at: Date.now() };
   store.set(`${CACHE_V}:opMeta`, meta);
   return meta;
 }
@@ -1456,10 +1462,12 @@ async function loadNovig(force) {
   const meta = await novigSetup();
   const data = asList(await opGet('/odds-by-tournaments', { tournamentIds: meta.tournamentId, bookmakers: 'novig.us' }));
   const name = (f, i) => f[`participant${i}Name`] || f.participants?.[i === 1 ? 'home' : 'away']?.name || meta.participants[f[`participant${i}Id`]] || '';
+  const skippedSeen = {};
   const fixtures = data.map(f => {
     const props = [];
     for (const [mid, mkt] of Object.entries(f.bookmakerOdds?.['novig.us']?.markets || {})) {
-      const m = meta.markets[mid]; if (!m) continue;
+      const m = meta.markets[mid];
+      if (!m) { const nm = meta.skipped?.[mid]; if (nm) skippedSeen[nm] = (skippedSeen[nm] || 0) + 1; continue; }
       const line = Number.isInteger(m.line) ? m.line - 0.5 : m.line; // milestone "30+" → over 29.5
       for (const [oid, oc] of Object.entries(mkt.outcomes || {})) {
         const side = m.outcomes[oid] || 'over';
@@ -1471,7 +1479,8 @@ async function loadNovig(force) {
     }
     return { start: f.startTime, p1: name(f, 1), p2: name(f, 2), props };
   });
-  NV = { at: Date.now(), fixtures };
+  NV = { at: Date.now(), fixtures, skippedSeen, rawFixtures: data.length,
+    withNovig: data.filter(f => f.bookmakerOdds?.['novig.us']).length };
   store.set(`${CACHE_V}:opOdds`, NV);
 }
 // match Novig's games and player names to ESPN's (cached until new data arrives)
@@ -1518,6 +1527,8 @@ function openSettings() {
   $('opKeyIn').value = opKey() ? '••••••••' : '';
   $('useNovig').checked = useNovig();
   $('useNovig').onchange = () => { store.set(`${CACHE_V}:useNovig`, $('useNovig').checked); renderAll(); };
+  $('nvMixed').checked = store.get(`${CACHE_V}:nvMixed`) ?? false;
+  $('nvMixed').onchange = () => { store.set(`${CACHE_V}:nvMixed`, $('nvMixed').checked); renderAll(); };
   showNovigStatus();
   const d = $('settingsDlg'); if (!d.open) d.showModal();
 }
@@ -1548,6 +1559,36 @@ async function refreshNovig() {
   showNovigStatus('Loading Novig lines… (uses 1 request; the first time also 3–4 setup requests)');
   try { await loadNovig(true); NVMAP = null; renderAll(); showNovigStatus(); }
   catch (e) { showNovigStatus(`<span class="neg">❌ ${e.message}</span>`); }
+}
+// A shareable summary of what Novig sent and what matched (never includes the API key)
+function novigReport() {
+  if (!NV) return 'No Novig data loaded.';
+  novigIndex();
+  const meta = store.get(`${CACHE_V}:opMeta`) || {};
+  const lines = [`Novig report ${new Date().toLocaleString()} (week ${selectedWeek()})`,
+    `OddsPapi fixtures: ${NV.rawFixtures ?? NV.fixtures.length}, with Novig odds: ${NV.withNovig ?? '?'}, matched to ESPN games: ${NVSTATS?.games || 0}`,
+    `Mapped market types: ${Object.keys(meta.markets || {}).length}; unmapped NFL player-prop types: ${Object.keys(meta.skipped || {}).length}`];
+  const byGame = [];
+  for (const g of S.games.filter(x => x.week === selectedWeek())) {
+    const nv = NVMAP?.[g.id], label = `${S.teams[g.away.id].abbr}@${S.teams[g.home.id].abbr}`;
+    if (!nv) { byGame.push(`${label}: no Novig match`); continue; }
+    const per = {};
+    for (const k of Object.keys(nv.props)) { const sk = k.split(':')[1]; per[sk] = (per[sk] || 0) + 1; }
+    byGame.push(`${label}: ${Object.keys(nv.props).length} player-stats (${Object.entries(per).map(([k, v]) => k + ' ' + v).join(', ') || 'none'})`);
+  }
+  lines.push('Per game:', ...byGame.map(x => '  ' + x));
+  const raw = NV.fixtures.map(f => `  ${f.p1} vs ${f.p2} ${String(f.start).slice(0, 10)}: ${f.props.length} lines`);
+  lines.push('Novig fixtures:', ...raw.slice(0, 20));
+  const sk = Object.entries(NV.skippedSeen || {}).sort((a, b) => b[1] - a[1]);
+  if (sk.length) lines.push('Novig markets present but not used:', ...sk.slice(0, 25).map(([n, c]) => `  ${n} ×${c}`));
+  const un = [...(NVSTATS?.unmatched || [])];
+  if (un.length) lines.push(`Unmatched names (${un.length}): ${un.slice(0, 40).join(', ')}`);
+  return lines.join('\n');
+}
+async function copyNovigReport() {
+  const r = novigReport();
+  try { await navigator.clipboard.writeText(r); showNovigStatus('📋 Report copied. Paste it into the chat. It does not contain your key.'); }
+  catch { showNovigStatus(`<div class="small">Copy this:</div><textarea style="width:100%;height:220px;font-size:11px;background:var(--panel2);color:var(--text)">${r.replace(/</g, '&lt;')}</textarea>`); }
 }
 function showNovigStatus(msg) {
   const box = $('opStatus');
