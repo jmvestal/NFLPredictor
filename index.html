@@ -212,8 +212,11 @@ dialog.sheet::backdrop{background:rgba(0,0,0,.6)}
     </label>
     <div class="muted small" id="pcHint"></div>
     <label class="pcinput" style="margin-top:8px">Bet amount ($)
-      <input id="pcStake" type="number" inputmode="decimal" min="0" step="1" placeholder="10">
+      <input id="pcStake" type="text" inputmode="decimal" autocomplete="off" placeholder="10">
     </label>
+    <nav class="chips" id="pcStakeChips" style="margin-top:6px;flex-wrap:wrap">
+      <button data-amt="5">$5</button><button data-amt="10">$10</button><button data-amt="25">$25</button><button data-amt="50">$50</button><button data-amt="100">$100</button>
+    </nav>
     <div id="pcResult" class="pcresult"></div>
     <div class="bar" style="margin-top:10px"><span id="pcTrack"></span><button class="btn sm" onclick="openOddsHelp()">ⓘ What do these mean?</button>
       <button class="btn sm" id="pcHide" onclick="hideCurrentPlayer()">🚫 Not on my app</button></div>
@@ -1527,7 +1530,7 @@ function nvBadge(price, trueP) {
 }
 
 // ---------- settings ----------
-const APP_VERSION = '2026-10-14 · 13 (bet amounts)'; // bump with sw.js CACHE so the user can confirm an update arrived
+const APP_VERSION = '2026-10-14 · 14 (bet amount buttons)'; // bump with sw.js CACHE so the user can confirm an update arrived
 function openSettings() {
   $('appVersion').textContent = APP_VERSION;
   $('opKeyIn').value = opKey() ? '••••••••' : '';
@@ -1734,7 +1737,7 @@ function renderPriceCheck() {
   const fairTxt = src.cents ? `${Math.floor(fairP * 100)}¢` : pcSource === 'novig' ? `${(1 / fairP).toFixed(2)}</b> (same as ${fmtMl(probToMl(fairP))})<b>` : fmtMl(probToMl(fairP));
   $('pcFacts').innerHTML = stt.facts.map(([l, v, cls]) => `<span class="${cls ? '' : 'muted'}">${l}</span><span class="${cls || 'muted'}">${v}</span>`).join('') +
     `<span>Fair price (no edge)</span><span>${src.cents ? `${Math.floor(fairP * 100)}¢` : pcSource === 'novig' ? `${(1 / fairP).toFixed(2)} (${fmtMl(probToMl(fairP))})` : fmtMl(probToMl(fairP))}</span>`;
-  if (raw.trim() || pcLine) { pcSaved[pcKey] = { v: raw.trim(), src: pcSource, stake: parseFloat($('pcStake').value) || undefined, ...(pcLine || {}) }; store.set(`${CACHE_V}:prices`, pcSaved); }
+  if (raw.trim() || pcLine) { pcSaved[pcKey] = { v: raw.trim(), src: pcSource, stake: readStake() || undefined, ...(pcLine || {}) }; store.set(`${CACHE_V}:prices`, pcSaved); }
   if (!pr) {
     box.className = 'pcresult';
     box.innerHTML = raw.trim() ? `<span class="neg">Couldn't read that price.</span> ${src.hint}` : `Enter your ${src.name} price to see if it's worth it. Anything ${src.cents ? 'below' : pcSource === 'novig' ? 'higher than' : 'better than'} <b>${fairTxt}</b> has an edge.`;
@@ -1745,7 +1748,8 @@ function renderPriceCheck() {
   const [cls, verdict] = edge >= 0.015 ? ['good', '✅ Bet'] : edge >= 0 ? ['thin', '⚠️ Thin edge'] : ['bad', '❌ Skip'];
   const risk = pr.odds < 0 ? `risk $${Math.round(-pr.odds)} to win $100` : `risk $100 to win $${Math.round(pr.odds)}`;
   // payout for the user's bet: profit per $1 = 1/implied - 1 (works for American, decimal and cents prices; fees not included)
-  const stake = parseFloat($('pcStake').value) || 0;
+  const stake = readStake();
+  document.querySelectorAll('#pcStakeChips button').forEach(b => b.classList.toggle('active', +b.dataset.amt === stake));
   const perDollar = 1 / pr.implied - 1, win = stake * perDollar, ev = stake * (stt.trueP * perDollar - (1 - stt.trueP));
   const money = v => (v < 0 ? '−$' : '$') + Math.abs(v).toFixed(2);
   const payout = stake > 0 ? `<div class="pcfacts" style="margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line)">
@@ -1767,13 +1771,15 @@ function renderPriceCheck() {
     $('pcTrack').innerHTML = `<button class="btn sm ${t ? 'done' : ''}" onclick="trackAtPrice()">${t ? `✓ Tracked: $${t.stake} at ${fmtMl(t.odds)}` : `+ Track${stake > 0 ? ' $' + stake : ''} at ${fmtMl(Math.round(pr.odds))}`}</button>`;
   } else $('pcTrack').innerHTML = '';
 }
+const readStake = () => parseFloat(String($('pcStake').value || '').replace(/[$,\s]/g, '')) || 0;
+document.querySelectorAll('#pcStakeChips button').forEach(b => b.onclick = () => { $('pcStake').value = b.dataset.amt; renderPriceCheck(); });
 function trackAtPrice() {
   const c = PC_CTX[pcKey], pr = parseFromSource($('pcOdds').value, pcSource);
   if (!c || !pr) return;
   const stt = pcState(c);
   if (!stt.track) return;
   const i = tracker.findIndex(t => t.key === stt.trackKey);
-  const stake = parseFloat($('pcStake').value) || parseFloat($('stakeIn').value) || 10;
+  const stake = readStake() || parseFloat($('stakeIn').value) || 10;
   if (i >= 0) { tracker[i].odds = Math.round(pr.odds); tracker[i].stake = stake; }
   else tracker.push({ ...stt.track, label: `${stt.track.label} · ${PC_SOURCES[pcSource].name}`, odds: Math.round(pr.odds), key: stt.trackKey, season: S.season, stake, ts: Date.now() });
   saveTracker(); renderPriceCheck(); renderAll();
