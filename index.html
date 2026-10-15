@@ -1219,6 +1219,10 @@ function roleChange(g, teamId, pid, sk) {
     if (i.pid === pid || !OUT_RE.test(i.status) || !ROLE_POS[role].includes(i.pos)) continue;
     const recent = (PD.logs[i.pid] || []).filter(h => h.season === S.season && h.week < g.week).slice(-3);
     if (!recent.length) continue;
+    // only a NEW absence changes roles: he must have played in his team's most recent game
+    // (a player already missing for weeks is reflected in his teammates' recent numbers)
+    const lastTeamWeek = Math.max(...S.games.filter(x => x.final && x.week < g.week && (x.home.id === teamId || x.away.id === teamId)).map(x => x.week));
+    if (recent[recent.length - 1].week !== lastTeamWeek) continue;
     const avg = idx => recent.reduce((a, h) => a + h.r[idx], 0) / recent.length;
     const used = role === 'pass' ? avg(1) >= 10 : role === 'rush' ? avg(5) >= 6 : avg(11) >= 3;
     if (used) out.push(i.name);
@@ -1531,7 +1535,7 @@ function nvBadge(price, trueP) {
 }
 
 // ---------- settings ----------
-const APP_VERSION = '2026-10-14 · 17 (Novig market names fixed)'; // bump with sw.js CACHE so the user can confirm an update arrived
+const APP_VERSION = '2026-10-15 · 18 (smarter role-change flag)'; // bump with sw.js CACHE so the user can confirm an update arrived
 function openSettings() {
   $('appVersion').textContent = APP_VERSION;
   $('opKeyIn').value = opKey() ? '••••••••' : '';
